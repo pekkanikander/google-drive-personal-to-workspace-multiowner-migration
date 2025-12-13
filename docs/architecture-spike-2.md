@@ -119,6 +119,7 @@ Create a new OAuth client (Web application) with initially:
 The spike **always** uses the OAuth authorization-code flow with PKCE via Google Identity Services (no implicit grant).
 This keeps us aligned with Google’s current guidance and avoids future deprecations.
 Only the browser participates; no backend exchange is available beyond the token request itself.
+During local runs the OAuth client secret is injected at build time through an environment variable so that it never needs to be committed to the repo.
 
 ---
 
@@ -158,7 +159,9 @@ No dynamic fetching; purely static. For this spike the manifest is bundled direc
    and the user’s token as `Authorization: Bearer ...`.
 6. On success:
    - Display new file ID and file name.
-   - Optionally link to the newly copied file.
+   - Optionally link to the newly moved file.
+
+> Implementation note (Jan 2025): the current spike uses `files.update` with `addParents`/`removeParents` so the personal file is moved into the Shared Drive folder rather than copied. This still relies entirely on the user’s OAuth token and the Drive ACLs configured by the admin.
 
 ---
 

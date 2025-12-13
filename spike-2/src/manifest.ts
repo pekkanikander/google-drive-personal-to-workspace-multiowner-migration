@@ -5,8 +5,16 @@ export interface Manifest {
 
 // Inline manifest for the spike. Update the values locally as needed.
 export const manifest: Manifest = {
-  sourceFileId: "SOURCE_FILE_ID",
+  sourceFileId: "1JUdNPV0SwdlQc0O-hrSvjnqRJQv78wJ07yGi0XroayI",
   allowedUsers: {
-    "example.user@gmail.com": "DESTINATION_FOLDER_ID"
+    "nikander.pekka@gmail.com": "10Px9dQKe2WeBl1YGf1BHafs5C4MicfWq"
+  }
+};
+
+// Inline manifest for the spike. Update the values locally as needed.
+export const manifest2: Manifest = {
+  sourceFileId: "1EGF_usFIAUzWaVZVh9poCynU4W9wnng1WkbTigYIVyo",
+  allowedUsers: {
+    "pekkailmari@holotropic.fi": "10Px9dQKe2WeBl1YGf1BHafs5C4MicfWq"
   }
 };

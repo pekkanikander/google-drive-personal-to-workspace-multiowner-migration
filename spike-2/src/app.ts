@@ -1,5 +1,5 @@
 import { runPkceAuth } from "./auth";
-import { copyFile } from "./drive";
+import { moveFile } from "./drive";
 import { manifest } from "./manifest";
 
 function setStatus(message: string): void {
@@ -26,23 +26,19 @@ async function handleStart(button: HTMLButtonElement): Promise<void> {
       );
     }
 
-    setStatus("Copying the test file into the Shared Drive...");
-    const result = await copyFile(
-      auth.accessToken,
-      manifest.sourceFileId,
-      destinationFolder
-    );
+    setStatus("Moving the test file into the Shared Drive...");
+    const result = await moveFile(auth.accessToken, manifest.sourceFileId, destinationFolder);
 
     const link = result.webViewLink ? `View file` : "";
     setStatus(
-      `Completed. Created file ${result.name ?? result.id} (${link || result.id}).`
+      `Completed. Moved file to ${result.name ?? result.id} (${link || result.id}).`
     );
 
     const output = document.getElementById("result");
     if (output) {
       output.innerHTML = "";
       const details = document.createElement("div");
-      details.textContent = `New file ID: ${result.id}`;
+      details.textContent = `File now at ID: ${result.id}`;
       output.appendChild(details);
       if (result.webViewLink) {
         const anchor = document.createElement("a");
