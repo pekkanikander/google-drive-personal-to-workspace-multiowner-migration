@@ -364,6 +364,7 @@ This spike was executed successfully on 2025-12-10 using a local Flask server on
   - The same user has write access to `DESTINATION_FOLDER_ID` in the Shared Drive.
   - The destination folder ID is copied exactly (no whitespace).
 
+
 **Practical integration findings**
 
 - OAuth consent and testing:
@@ -377,7 +378,20 @@ This spike was executed successfully on 2025-12-10 using a local Flask server on
 - Drive semantics:
   - Errors referring to `fileId` can in practice point to an invalid or inaccessible destination folder ID, not only the source file.
   - Shared Drive membership rules may prevent some personal accounts from being added as editors; the final architecture must accommodate this.
+- Deployment and infrastructure:
+    - In hardened organisations where automatic IAM grants for default service accounts are disabled and billing is required, Cloud Run / Cloud Build deployment requires explicit setup: enabling billing on the project, granting storage and Artifact Registry roles to the default Compute Engine and Cloud Build service accounts, and ensuring that both the Cloud Build bucket and a "gcr.io"-compatible Artifact Registry repository exist and are writable. These steps are infrastructure concerns rather than core app logic but are essential for reproducible deployments.
+- Secure-by-default Workspace behaviour (late 2025):
+    - Newly created Google Workspace for Nonprofits organisations now ship with restrictive defaults such as
+      `iam.allowedPolicyMemberDomains`, which prevent adding `allUsers` as IAM members on Cloud Run services.
+      As a result, `--allow-unauthenticated` may not actually make a service publicly invokable, and browsers hitting the
+      `run.app` URL without an explicit identity token continue to receive 403 responses even when the admin is logged in.
+      This hardening appears to be the new normal for fresh Workspace tenants and must be treated as a first-class
+      deployment constraint rather than an edge case.
 
-These observations confirm the core architectural assumption: a Workspace-hosted app can use a personal user’s OAuth token to perform Drive operations that cross from personal Drive into a Workspace Shared Drive, provided Drive-level permissions are correctly configured. They also highlight several edge conditions and configuration details that the main design must handle explicitly in later phases.
+
+These observations confirm the core architectural assumption:
+a Workspace-hosted app can use a personal user’s OAuth token to perform Drive operations that cross from personal Drive into a Workspace Shared Drive,
+provided Drive-level permissions are correctly configured.
+They also highlight several edge conditions and configuration details that the main design must handle explicitly in later phases.
 
 This architecture-spike.md alone is considered sufficient documentation for operating this spike; see spike/README.md for further details.
