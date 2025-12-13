@@ -1,6 +1,6 @@
 export interface OAuthConfig {
   clientId: string;
-  redirectUri: string;
+  redirectUri: string; // TODO: remove, as no longer needed
 }
 
 // TODO: Replace the placeholder client ID before running the spike locally.
