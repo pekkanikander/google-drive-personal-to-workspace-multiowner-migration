@@ -1,19 +1,13 @@
 import esbuild from "esbuild";
 
 const watchMode = process.argv.includes("--watch");
-const define = {
-  "process.env.SPIKE2_CLIENT_SECRET": JSON.stringify(
-    process.env.SPIKE2_CLIENT_SECRET ?? ""
-  )
-};
 
 const commonOptions = {
   entryPoints: ["src/app.ts"],
   bundle: true,
   outfile: "public/app.js",
   format: "iife",
-  sourcemap: true,
-  define
+  sourcemap: true
 };
 
 async function run() {
