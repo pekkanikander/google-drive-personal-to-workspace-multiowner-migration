@@ -3,8 +3,19 @@ export interface Manifest {
   allowedUsers: Record<string, string>;
 }
 
+
+
+
 // Inline manifest for the spike. Update the values locally as needed.
 export const manifest: Manifest = {
+  sourceFileId: "1mEOEuuRGB7x7N1aU1GAHBmQzke_ww_GyyXpyYKNk4-Q",
+  allowedUsers: {
+    "nikander.pekka@gmail.com": "10Px9dQKe2WeBl1YGf1BHafs5C4MicfWq"
+  }
+};
+
+// Inline manifest for the spike. Update the values locally as needed.
+export const manifest1: Manifest = {
   sourceFileId: "1JUdNPV0SwdlQc0O-hrSvjnqRJQv78wJ07yGi0XroayI",
   allowedUsers: {
     "nikander.pekka@gmail.com": "10Px9dQKe2WeBl1YGf1BHafs5C4MicfWq"

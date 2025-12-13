@@ -148,20 +148,15 @@ No dynamic fetching; purely static. For this spike the manifest is bundled direc
 4. JS checks:
    - Is `email` in `allowed_users`?
      If not → refuse.
-5. JS calls:
-   ```http
-   POST https://www.googleapis.com/drive/v3/files/{sourceId}/copy
-   ```
-   with:
-   ```json
-   { "parents": ["TARGET_FOLDER_ID"] }
-   ```
-   and the user’s token as `Authorization: Bearer ...`.
+5. JS calls the Drive API using the user’s token:
+   - Default variant (current spike): `PATCH https://www.googleapis.com/drive/v3/files/{sourceId}?supportsAllDrives=true&addParents=DEST&removeParents=SRC`
+     with an empty JSON body to **move** the file.
+   - Alternative experiments (future): `files.copy` or `files.create` for pure copy workflows.
 6. On success:
    - Display new file ID and file name.
    - Optionally link to the newly moved file.
 
-> Implementation note (Jan 2025): the current spike uses `files.update` with `addParents`/`removeParents` so the personal file is moved into the Shared Drive folder rather than copied. This still relies entirely on the user’s OAuth token and the Drive ACLs configured by the admin.
+> Implementation note (Jan 2025): the current spike uses `files.update` with `addParents`/`removeParents` so the personal file is moved into the Shared Drive folder rather than copied. The file keeps its ID because Drive moves preserve IDs; only its parents change. This still relies entirely on the user’s OAuth token and the Drive ACLs configured by the admin.
 
 ---
 
@@ -196,6 +191,32 @@ This spike is not concerned with:
 
 ---
 
-## Result and lessons (to be filled after spike)
+## Result and lessons (Dec 2025)
 
-Leave this section empty for now.
+- **GIS OAuth code+PKCE works entirely in-browser.**
+  Re-using the spike-1 OAuth client (after adding the static origin/redirect) and
+  injecting the secret at build time via `SPIKE2_CLIENT_SECRET` was sufficient.
+  Popups must be allowed; otherwise the flow fails immediately.
+- **Static hosting works.** Serving `public/` via `python3 -m http.server 8081` (or equivalent)
+  is all that is needed to exercise the flow; no backend helpers were required.
+- **Manifest-gated access behaves as expected.** The inline manifest check is trivial to bypass,
+  so Drive ACLs remain the real guardrail. Both Workspace-managed Gmail accounts and
+  unrelated personal Gmail accounts succeeded after being granted editor access to the destination folder.
+- **Drive moves preserve file IDs.** Using `files.update` with `addParents`/`removeParents` successfully
+  moved a file from a personal Drive into a Shared Drive while retaining the original file ID.
+  This validates “move-first” as the default migration mode, keeping downstream links intact.
+  - `removeParents` seem to be ignored** when moving a file into a Shared Drive.
+    Verify this observation when building the production version, and if so, document it.
+- **Moving requires the user to be the owner (or at least writer) of the source.**
+  When the OAuth user was not the owner, Drive errors surfaced as expected.
+  We intentionally do not pre-check ownership; Drive enforces it.
+- **Drive UI moves can change ownership and break repeatability.**
+  In testing, moving a file into the Shared Drive via the API succeeded,
+  but moving the same file back to the source via the Drive UI could change the file’s owner.
+  Subsequent API moves then failed with “admin has not granted permission” / Shared Drive move-in errors
+  because the effective owner/role context had changed.  Treat ownership as potentially mutable.
+- **Copy variants remain future work.** The current SPA is structured so we can later swap
+  the transfer call (`files.copy`, `files.create`) to validate the “copy” modes without
+  rewriting auth/manifest plumbing.
+- **Cloud hosting still pending.** All testing so far ran locally; the next step is to deploy
+  the static assets to a cloud host (e.g. Firebase Hosting) and confirm the same flow works with HTTPS origins.
