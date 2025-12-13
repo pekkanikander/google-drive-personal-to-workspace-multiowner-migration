@@ -220,3 +220,9 @@ This spike is not concerned with:
   rewriting auth/manifest plumbing.
 - **Cloud hosting still pending.** All testing so far ran locally; the next step is to deploy
   the static assets to a cloud host (e.g. Firebase Hosting) and confirm the same flow works with HTTPS origins.
+- **Red flag: client secret handling in a pure SPA.**
+  The spike currently mentions injecting an OAuth client secret at build time.
+  In a static, browser-only deployment, any embedded secret is not actually secret and cannot be relied upon for security.
+  Before packaging this for non-technical admins, re-check the OAuth client type and
+  flow so that deployment does not require distributing or embedding a client secret
+  (prefer a PKCE-based public client configuration).
