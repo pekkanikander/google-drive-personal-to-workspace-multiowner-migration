@@ -75,6 +75,7 @@ This tool may or may not reach beta maturity; usefulness will determine developm
 - Architecture design in progress; see [Design overview](docs/design-overview.md) for details.
 - Documentation drafted before implementation.
 - Alpha-level behaviour planned for small-scale trials.
+- Key risks are tracked in [docs/risks.md](docs/risks.md).
 
 ## Contributing
 

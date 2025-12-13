@@ -228,6 +228,7 @@ This keeps the alpha implementation simple and avoids silently collapsing struct
   - Initial answer: Requires a new (re)run of the tool. Without a rerun, no new files are detected and deleted ones fail, as the manifest stays the same.
 - Should the admin be allowed to override destination paths for selected subtrees?
   - This may be a later option. Not in the first version.
-+- How should edge cases be handled (Forms + response Sheets, multi-parent files, and token/session expiry during long runs)?
+- How should edge cases be handled (Forms + response Sheets, multi-parent files, and token/session expiry during long runs)?
+- How do we mitigate the risks enumerated in [docs/risks.md](docs/risks.md) (service-account visibility, admin workflow overhead, temporary permissions, manifest storage, etc.)?
 
 These will be iterated as implementation proceeds.
