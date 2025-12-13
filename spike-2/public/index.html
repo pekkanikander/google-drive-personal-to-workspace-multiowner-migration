@@ -1,0 +1,39 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Migration Spike 2</title>
+    <style>
+      body {
+        font-family: system-ui, sans-serif;
+        margin: 2rem auto;
+        max-width: 640px;
+        line-height: 1.5;
+      }
+      button {
+        padding: 0.6rem 1rem;
+        font-size: 1rem;
+      }
+      #status {
+        margin-top: 1rem;
+        font-weight: 600;
+      }
+      #result {
+        margin-top: 0.5rem;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Google Drive Migration Spike 2</h1>
+    <p>
+      This spike verifies whether a personal Gmail user can authorise a purely browser-based
+      tool to copy a fixed file from their personal Drive into a designated folder inside a Workspace Shared Drive.
+    </p>
+    <p><strong>Important:</strong> update <code>manifest.ts</code> and <code>config.ts</code> before running.</p>
+    <button id="start">Start spike</button>
+    <div id="status">Idle.</div>
+    <div id="result"></div>
+    <script src="app.js"></script>
+  </body>
+</html>

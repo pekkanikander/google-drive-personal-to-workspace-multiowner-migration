@@ -1,0 +1,12 @@
+{
+  "name": "google-drive-migration-spike-2",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "esbuild src/app.ts --bundle --outfile=public/app.js --format=iife --sourcemap",
+    "watch": "esbuild src/app.ts --bundle --outfile=public/app.js --format=iife --sourcemap --watch"
+  },
+  "devDependencies": {
+    "esbuild": "^0.20.0"
+  }
+}
