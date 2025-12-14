@@ -160,3 +160,8 @@ If this spike behaves as intended, we will have concrete evidence that:
 - The Drive API provides sufficient metadata to build a robust manifest for later multi-owner migration and store it in Drive for the user SPA.
 
 The next design steps can then safely assume the existence of an admin-SPA-driven enumeration phase followed by the user-SPA move/copy phase, as outlined in the main design overview and `design-two-spas.md`.
+
+## Result (Dec 2026)
+
+- The browser-only admin SPA ran end-to-end from localhost and Github Pages on the first try: GIS token auth, full enumeration of the shared personal root, CSV download and upload to Drive, and Google Sheets write once the Sheets API was enabled.
+- Initial Sheets write attempt failed with `PERMISSION_DENIED` because `sheets.googleapis.com` was not enabled for the OAuth project; enabling the API resolved it immediately.

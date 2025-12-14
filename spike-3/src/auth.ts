@@ -6,12 +6,7 @@ import { oauthConfig } from "./config";
 const GIS_SCRIPT_SRC = "https://accounts.google.com/gsi/client";
 const USERINFO_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo";
 
-const SCOPES = [
-  "openid",
-  "email",
-  "profile",
-  "https://www.googleapis.com/auth/drive"
-];
+const SCOPES = ["openid", "email", "profile", "https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"];
 
 export interface AuthResponse {
   accessToken: string;

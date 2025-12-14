@@ -1,6 +1,6 @@
 import { DriveItem } from "./drive";
 
-const HEADERS = [
+export const HEADERS = [
   "id",
   "name",
   "mimeType",
@@ -41,27 +41,35 @@ function formatPermissions(item: DriveItem): string {
   return perms.length > 0 ? JSON.stringify(perms) : "";
 }
 
-export function renderCsv(items: DriveItem[]): string {
-  const lines: string[] = [];
-  lines.push(HEADERS.join(","));
+export function itemsToRows(items: DriveItem[]): string[][] {
+  const rows: string[][] = [];
+  rows.push([...HEADERS]);
 
   for (const item of items) {
-    const row: string[] = [];
-    row.push(item.id ?? "");
-    row.push(item.name ?? "");
-    row.push(item.mimeType ?? "");
-    row.push(formatParents(item));
-    row.push(formatOwners(item));
-    row.push(item.driveId ?? "");
-    row.push(item.trashed ? "true" : "false");
-    row.push(item.shortcutDetails?.targetId ?? "");
-    row.push(item.shortcutDetails?.targetMimeType ?? "");
-    row.push(formatPermissions(item));
-    row.push(item.createdTime ?? "");
-    row.push(item.modifiedTime ?? "");
-
-    lines.push(row.map((v) => csvEscape(v)).join(","));
+    rows.push([
+      item.id ?? "",
+      item.name ?? "",
+      item.mimeType ?? "",
+      formatParents(item),
+      formatOwners(item),
+      item.driveId ?? "",
+      item.trashed ? "true" : "false",
+      item.shortcutDetails?.targetId ?? "",
+      item.shortcutDetails?.targetMimeType ?? "",
+      formatPermissions(item),
+      item.createdTime ?? "",
+      item.modifiedTime ?? ""
+    ]);
   }
 
+  return rows;
+}
+
+export function renderCsv(items: DriveItem[]): string {
+  const lines: string[] = [];
+  const rows = itemsToRows(items);
+  for (const row of rows) {
+    lines.push(row.map((v) => csvEscape(v)).join(","));
+  }
   return lines.join("\n");
 }

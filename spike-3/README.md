@@ -1,6 +1,6 @@
 # Architecture Spike 3 (admin-side enumeration SPA)
 
-Throwaway SPA that authenticates the admin in-browser (GIS token client), enumerates a shared personal Drive root, and emits a CSV manifest. No backend, no service account.
+Throwaway SPA that authenticates the admin in-browser (GIS token client), enumerates a shared personal Drive root, and emits a CSV manifest (or writes a Google Sheet). No backend, no service account.
 
 ## Setup
 
@@ -30,4 +30,9 @@ cd public
 python3 -m http.server 8081
 ```
 
-Open the page, click **Authenticate**, then **Enumerate**. Download the CSV, or try **Write CSV to Drive** to upload into the configured destination folder. Multi-parent and shortcut items are only logged; no special handling beyond inclusion in the CSV.
+Open the page, click **Authenticate**, then **Enumerate**. Download the CSV, try **Write CSV to Drive**, or **Write Google Sheet** to create a Sheets file in the configured destination folder. Multi-parent and shortcut items are only logged; no special handling beyond inclusion in the outputs.
+
+## Notes / gotchas
+
+- Google Sheets API must be enabled on the OAuth project to use **Write Google Sheet**. Without it, the Sheets write call fails with `PERMISSION_DENIED` and a `service=sheets.googleapis.com` activation URL. Enable the API in Cloud Console and retry.
+- Once the API was enabled, the spike succeeded end-to-end (auth → enumerate → CSV upload → Sheets write) from localhost and Github Pages with no further issues.

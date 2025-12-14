@@ -2,6 +2,7 @@ import { runBrowserAuth, AuthResponse } from "./auth";
 import { adminConfig } from "./config";
 import { DriveItem, enumerateTree, uploadCsvToDrive } from "./drive";
 import { renderCsv } from "./csv";
+import { createSheetFromItems } from "./sheets";
 
 let auth: AuthResponse | null = null;
 let items: DriveItem[] = [];
@@ -27,7 +28,8 @@ function setRunning(running: boolean): void {
     "auth",
     "enumerate",
     "download",
-    "upload"
+    "upload",
+    "sheet"
   ]
     .map((id) => byId<HTMLButtonElement>(id))
     .filter((b): b is HTMLButtonElement => !!b);
@@ -174,11 +176,36 @@ async function handleUpload(): Promise<void> {
   }
 }
 
+async function handleSheet(): Promise<void> {
+  setRunning(true);
+  try {
+    ensureAuth();
+    if (items.length === 0) throw new Error("Nothing to write. Run enumeration first.");
+    const dest = adminConfig.destinationManifestFolderId;
+    if (!dest || dest.startsWith("REPLACE_WITH")) {
+      throw new Error("Configure destinationManifestFolderId first.");
+    }
+
+    const title = (adminConfig.manifestFilename || "spike-3-manifest").replace(/\.csv$/i, "");
+
+    setStatus("Creating Google Sheet...");
+    const { spreadsheetId } = await createSheetFromItems(auth.accessToken, dest, title, items);
+    setStatus(`Sheet created. Spreadsheet ID: ${spreadsheetId}`);
+    appendLog(`Sheet created. Spreadsheet ID: ${spreadsheetId}`);
+  } catch (err) {
+    setStatus(err instanceof Error ? err.message : String(err));
+    appendLog("Sheet creation failed.");
+  } finally {
+    setRunning(false);
+  }
+}
+
 function init(): void {
   byId<HTMLButtonElement>("auth")?.addEventListener("click", () => void handleAuth());
   byId<HTMLButtonElement>("enumerate")?.addEventListener("click", () => void handleEnumerate());
   byId<HTMLButtonElement>("download")?.addEventListener("click", () => handleDownload());
   byId<HTMLButtonElement>("upload")?.addEventListener("click", () => void handleUpload());
+  byId<HTMLButtonElement>("sheet")?.addEventListener("click", () => void handleSheet());
 
   const cfg = byId<HTMLPreElement>("config");
   if (cfg) {

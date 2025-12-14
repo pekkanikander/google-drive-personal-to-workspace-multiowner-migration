@@ -35,7 +35,7 @@ async function listFolderOnce(accessToken: string, folderId: string, pageToken?:
   ].join(",");
 
   const params = new URLSearchParams({
-    q: `'${folderId}' in parents and trashed = false`,
+    q: `'${folderId}' in parents`,
     includeItemsFromAllDrives: "true",
     supportsAllDrives: "true",
     fields

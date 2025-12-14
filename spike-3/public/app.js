@@ -13,12 +13,7 @@
   // src/auth.ts
   var GIS_SCRIPT_SRC = "https://accounts.google.com/gsi/client";
   var USERINFO_ENDPOINT = "https://openidconnect.googleapis.com/v1/userinfo";
-  var SCOPES = [
-    "openid",
-    "email",
-    "profile",
-    "https://www.googleapis.com/auth/drive"
-  ];
+  var SCOPES = ["openid", "email", "profile", "https://www.googleapis.com/auth/drive", "https://www.googleapis.com/auth/spreadsheets"];
   function loadGisScriptOnce() {
     if (window.google?.accounts?.oauth2) return Promise.resolve();
     const existing = document.querySelector(`script[src="${GIS_SCRIPT_SRC}"]`);
@@ -90,7 +85,7 @@
       "files(id,name,mimeType,parents,owners(emailAddress),driveId,trashed,shortcutDetails(targetId,targetMimeType),permissions(emailAddress,role,type),createdTime,modifiedTime)"
     ].join(",");
     const params = new URLSearchParams({
-      q: `'${folderId}' in parents and trashed = false`,
+      q: `'${folderId}' in parents`,
       includeItemsFromAllDrives: "true",
       supportsAllDrives: "true",
       fields
@@ -205,26 +200,89 @@
     }));
     return perms.length > 0 ? JSON.stringify(perms) : "";
   }
+  function itemsToRows(items2) {
+    const rows = [];
+    rows.push([...HEADERS]);
+    for (const item of items2) {
+      rows.push([
+        item.id ?? "",
+        item.name ?? "",
+        item.mimeType ?? "",
+        formatParents(item),
+        formatOwners(item),
+        item.driveId ?? "",
+        item.trashed ? "true" : "false",
+        item.shortcutDetails?.targetId ?? "",
+        item.shortcutDetails?.targetMimeType ?? "",
+        formatPermissions(item),
+        item.createdTime ?? "",
+        item.modifiedTime ?? ""
+      ]);
+    }
+    return rows;
+  }
   function renderCsv(items2) {
     const lines = [];
-    lines.push(HEADERS.join(","));
-    for (const item of items2) {
-      const row = [];
-      row.push(item.id ?? "");
-      row.push(item.name ?? "");
-      row.push(item.mimeType ?? "");
-      row.push(formatParents(item));
-      row.push(formatOwners(item));
-      row.push(item.driveId ?? "");
-      row.push(item.trashed ? "true" : "false");
-      row.push(item.shortcutDetails?.targetId ?? "");
-      row.push(item.shortcutDetails?.targetMimeType ?? "");
-      row.push(formatPermissions(item));
-      row.push(item.createdTime ?? "");
-      row.push(item.modifiedTime ?? "");
+    const rows = itemsToRows(items2);
+    for (const row of rows) {
       lines.push(row.map((v) => csvEscape(v)).join(","));
     }
     return lines.join("\n");
+  }
+
+  // src/sheets.ts
+  var SHEET_MIME = "application/vnd.google-apps.spreadsheet";
+  function baseTitle(csvName) {
+    return csvName.replace(/\.csv$/i, "") || "spike-3-manifest";
+  }
+  async function createEmptySheet(accessToken, destinationFolderId, title) {
+    const url = "https://www.googleapis.com/drive/v3/files?supportsAllDrives=true";
+    const metadata = {
+      name: title,
+      mimeType: SHEET_MIME,
+      parents: [destinationFolderId]
+    };
+    const res = await fetch(url, {
+      method: "POST",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify(metadata)
+    });
+    const bodyText = await res.text();
+    if (!res.ok) {
+      throw new Error(`Failed to create sheet: ${res.status} ${res.statusText}. Body: ${bodyText}`);
+    }
+    const json = bodyText ? JSON.parse(bodyText) : {};
+    if (!json.id) throw new Error("Sheet creation succeeded but missing file id.");
+    return json.id;
+  }
+  async function writeRows(accessToken, spreadsheetId, rows) {
+    const range = "Sheet1!A1";
+    const url = `https://sheets.googleapis.com/v4/spreadsheets/${encodeURIComponent(spreadsheetId)}/values/${encodeURIComponent(
+      range
+    )}?valueInputOption=RAW`;
+    const res = await fetch(url, {
+      method: "PUT",
+      headers: {
+        Authorization: `Bearer ${accessToken}`,
+        "Content-Type": "application/json"
+      },
+      body: JSON.stringify({ values: rows })
+    });
+    const bodyText = await res.text();
+    if (!res.ok) {
+      throw new Error(`Failed to write sheet values: ${res.status} ${res.statusText}. Body: ${bodyText}`);
+    }
+  }
+  async function createSheetFromItems(accessToken, destinationFolderId, suggestedName, items2) {
+    const rows = itemsToRows(items2);
+    if (rows.length === 0) rows.push([...HEADERS]);
+    const title = baseTitle(suggestedName);
+    const spreadsheetId = await createEmptySheet(accessToken, destinationFolderId, title);
+    await writeRows(accessToken, spreadsheetId, rows);
+    return { spreadsheetId, title };
   }
 
   // src/app.ts
@@ -248,7 +306,8 @@
       "auth",
       "enumerate",
       "download",
-      "upload"
+      "upload",
+      "sheet"
     ].map((id) => byId(id)).filter((b) => !!b);
     buttons.forEach((b) => b.disabled = running);
   }
@@ -375,11 +434,33 @@
       setRunning(false);
     }
   }
+  async function handleSheet() {
+    setRunning(true);
+    try {
+      ensureAuth();
+      if (items.length === 0) throw new Error("Nothing to write. Run enumeration first.");
+      const dest = adminConfig.destinationManifestFolderId;
+      if (!dest || dest.startsWith("REPLACE_WITH")) {
+        throw new Error("Configure destinationManifestFolderId first.");
+      }
+      const title = (adminConfig.manifestFilename || "spike-3-manifest").replace(/\.csv$/i, "");
+      setStatus("Creating Google Sheet...");
+      const { spreadsheetId } = await createSheetFromItems(auth.accessToken, dest, title, items);
+      setStatus(`Sheet created. Spreadsheet ID: ${spreadsheetId}`);
+      appendLog(`Sheet created. Spreadsheet ID: ${spreadsheetId}`);
+    } catch (err) {
+      setStatus(err instanceof Error ? err.message : String(err));
+      appendLog("Sheet creation failed.");
+    } finally {
+      setRunning(false);
+    }
+  }
   function init() {
     byId("auth")?.addEventListener("click", () => void handleAuth());
     byId("enumerate")?.addEventListener("click", () => void handleEnumerate());
     byId("download")?.addEventListener("click", () => handleDownload());
     byId("upload")?.addEventListener("click", () => void handleUpload());
+    byId("sheet")?.addEventListener("click", () => void handleSheet());
     const cfg = byId("config");
     if (cfg) {
       cfg.textContent = JSON.stringify(
