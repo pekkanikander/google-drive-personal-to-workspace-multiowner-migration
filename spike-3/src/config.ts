@@ -10,11 +10,11 @@ export interface AdminConfig {
 
 // TODO: Fill these with real IDs/client once ready to run the spike locally.
 export const oauthConfig: OAuthConfig = {
-  clientId: "REPLACE_WITH_OAUTH_CLIENT_ID"
+  clientId: "554015392094-jbp76oeeqr52d4ol8c261fg398cvecio.apps.googleusercontent.com"
 };
 
 export const adminConfig: AdminConfig = {
-  sourceRootFolderId: "REPLACE_WITH_SOURCE_ROOT_FOLDER_ID",
-  destinationManifestFolderId: "REPLACE_WITH_DESTINATION_JOB_FOLDER_ID",
+  sourceRootFolderId: "1BOVZer9jAPNhHS7syxLf99n9Tf-27B4O",
+  destinationManifestFolderId: "10Px9dQKe2WeBl1YGf1BHafs5C4MicfWq",
   manifestFilename: "spike-3-manifest.csv"
 };
