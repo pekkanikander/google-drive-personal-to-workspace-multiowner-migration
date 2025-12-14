@@ -1,0 +1,63 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spike 3 — Admin Enumerator</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 24px;
+        line-height: 1.5;
+      }
+      button {
+        margin-right: 8px;
+        margin-bottom: 12px;
+      }
+      #log {
+        border: 1px solid #ccc;
+        padding: 8px;
+        height: 200px;
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+      #multiparent {
+        border: 1px solid #ccc;
+        padding: 8px;
+        min-height: 80px;
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Architecture Spike 3 — Admin Enumeration (SPA)</h1>
+    <p>
+      This throwaway page authenticates the admin in-browser, enumerates the shared personal root folder, and produces a CSV manifest.
+      Configure the IDs in <code>src/config.ts</code> before running. Keep it simple: authenticate → enumerate → download/upload CSV.
+    </p>
+
+    <div>
+      <button id="auth">Authenticate (GIS token)</button>
+      <button id="enumerate">Enumerate tree</button>
+      <button id="download">Download CSV</button>
+      <button id="upload">Write CSV to Drive</button>
+    </div>
+
+    <div><strong>Status:</strong> <span id="status">idle</span></div>
+
+    <h3>Configured IDs</h3>
+    <pre id="config"></pre>
+
+    <h3>Summary</h3>
+    <div id="summary"></div>
+
+    <h3>Multi-parent items</h3>
+    <pre id="multiparent">(none)</pre>
+
+    <h3>Log</h3>
+    <pre id="log"></pre>
+
+    <script src="./app.js"></script>
+  </body>
+</html>

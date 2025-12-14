@@ -1,0 +1,12 @@
+{
+  "name": "google-drive-migration-spike-3",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "build": "node build.mjs",
+    "watch": "node build.mjs --watch"
+  },
+  "devDependencies": {
+    "esbuild": "^0.27.1"
+  }
+}
