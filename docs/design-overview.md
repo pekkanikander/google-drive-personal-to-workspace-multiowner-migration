@@ -165,6 +165,11 @@ All modes run per file and are idempotent with manifest tracking. Ownership tran
 
 Moves keep IDs intact, so downstream references/bookmarks continue to work; the restore/copy variants control whether collaborators still see a file in the source location and whether a new ID is introduced there.
 
+### Idempotency approach (moves vs. copies)
+
+- **Move:** treat as “effectively idempotent” by reading live parents first. If the file is already in the destination drive/parent, treat as done. Otherwise, issue `PATCH files/{id}` with `supportsAllDrives=true`, `addParents=<dest_parent_id>`, and `removeParents=<current parents from the fresh GET>`. Do not reuse stale `removeParents` values. Retries re-run the same check+patch, avoiding duplicates.
+- **Copy / move+restore copy:** `files.copy` always creates a new ID; retries will duplicate unless the destination IDs are recorded. Later modes must track `dest_file_id` (and `restore_copy_id`) in the manifest and skip if they already exist under the expected parent. There is no API-level idempotency token for copy.
+
 ### 4. Content Transfer to Workspace
 
 For each file owned by the user:

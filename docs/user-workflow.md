@@ -7,6 +7,20 @@ All technical complexity is handled by the Workspace administrator and the migra
 
 ---
 
+## Alpha addendum (move-only, SPA-only)
+
+This addendum captures alpha-specific constraints; remove or revise as we progress beyond alpha:
+- Move-only; copy and move+restore deferred.
+- Two SPAs on static hosting; no backend for user flow.
+- Coordination via Google Sheet tabs `JobInfo`, `Manifest`, `Log`; link carries sheet ID + job token (non-secret).
+- Temporary Shared Drive Manager access during migration; revoked afterward.
+- Keep the browser tab open; resume only works on the same browser and device.
+  If the tab crashes, reopen on the same device using the same browser to continue; cross-device resume is not supported.
+- The app skips multi-owner rows and only processes files owned by the signed-in user.
+- Errors/quotas surface as “fail fast”; retry after a pause or as instructed by the admin.
+
+---
+
 ## Who is this for?
 
 This workflow applies to users who:
