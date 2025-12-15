@@ -1,0 +1,62 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Spike 4 — Sheets manifest concurrency dry-run</title>
+    <style>
+      body {
+        font-family: Arial, sans-serif;
+        margin: 24px;
+        line-height: 1.5;
+      }
+      button {
+        margin-right: 8px;
+        margin-bottom: 12px;
+      }
+      #log {
+        border: 1px solid #ccc;
+        padding: 8px;
+        height: 200px;
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+      #multiparent {
+        border: 1px solid #ccc;
+        padding: 8px;
+        min-height: 80px;
+        overflow: auto;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <h1>Architecture Spike 4 — Sheets manifest + per-user logging (SPA-only)</h1>
+    <p>
+      This dry-run SPA reads the shared manifest (Google Sheet), claims small batches of rows for the signed-in user, simulates work with a delay, marks completion,
+      and appends coarse log entries. It relies on batching + a tiny IndexedDB journal. Do not edit/sort the sheet while this runs.
+    </p>
+
+    <div>
+      <button id="auth">Authenticate (GIS token)</button>
+      <button id="start">Load manifest + start</button>
+    </div>
+
+    <div><strong>Status:</strong> <span id="status">idle</span></div>
+    <div><strong>Session ID:</strong> <span id="session"></span></div>
+
+    <h3>Counts</h3>
+    <div id="counts"></div>
+
+    <h3>Multi-owner rows (skipped)</h3>
+    <pre id="multiowner">(none)</pre>
+
+    <h3>Configured IDs</h3>
+    <pre id="config"></pre>
+
+    <h3>Log</h3>
+    <pre id="log"></pre>
+
+    <script src="./app.js"></script>
+  </body>
+</html>
