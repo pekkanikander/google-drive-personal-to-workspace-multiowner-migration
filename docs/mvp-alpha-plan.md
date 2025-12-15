@@ -9,6 +9,7 @@ Purpose: lock the alpha scope, surface explicit constraints, and define the mini
 - Google Sheets-backed coordination (manifest + status/log).
   - Fail fast on schema mismatches
   - No API retries/backoff beyond coarse batching.
+- Trashed items in the source tree are skipped; moving them would require untrashing first (out of scope for alpha).
 - Temporary manual Shared Drive Manager grants per participating user
   - Admin grants manually before starting.
   - If feasible, the admin SPA checks that the grants are there.
