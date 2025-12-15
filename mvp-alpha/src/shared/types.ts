@@ -12,6 +12,7 @@ export interface JobInfo {
   manifest_sheet_name: string;
   log_sheet_name: string;
   source_root_id: string;
+  // consider storing oauth_client_id if desired for traceability
 }
 
 export interface JobInfoRow {

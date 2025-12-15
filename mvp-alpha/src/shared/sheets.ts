@@ -1,6 +1,40 @@
 import { JobInfo, JobInfoRow, LogEntry, ManifestRow, ManifestStatus } from "./types";
 
 const SHEETS_API = "https://sheets.googleapis.com/v4/spreadsheets";
+export const JOB_INFO_KEYS: Array<keyof JobInfo> = [
+  "job_id",
+  "job_label",
+  "transfer_mode",
+  "manifest_version",
+  "dest_drive_id",
+  "dest_root_id",
+  "manifest_sheet_name",
+  "log_sheet_name",
+  "source_root_id",
+  // optional: oauth_client_id could be added here if stored
+];
+
+export const LOG_HEADERS = ["timestamp", "event", "user_email", "row_index", "file_id", "session_id", "details"] as const;
+
+export const MANIFEST_HEADERS = [
+  "id",
+  "name",
+  "mimeType",
+  "parents",
+  "owners",
+  "driveId",
+  "trashed",
+  "shortcut_target_id",
+  "shortcut_target_mimeType",
+  "permissions",
+  "createdTime",
+  "modifiedTime",
+  "dest_parent_id",
+  "dest_drive_id",
+  "status",
+  "worker_session_id",
+  "error",
+] as const;
 
 export class SheetsClient {
   constructor(private readonly accessToken: string, private readonly sheetId: string) {
@@ -49,6 +83,62 @@ export class SheetsClient {
       }),
     });
   }
+
+  async getSheets(): Promise<Array<{ sheetId: number; title: string; index: number }>> {
+    const data = await this.request<{ sheets?: Array<{ properties?: { sheetId?: number; title?: string; index?: number } }> }>(
+      "?fields=sheets.properties",
+      { method: "GET" },
+    );
+    return (data.sheets ?? [])
+      .map((s) => ({
+        sheetId: s.properties?.sheetId ?? -1,
+        title: s.properties?.title ?? "",
+        index: s.properties?.index ?? 0,
+      }))
+      .filter((s) => s.sheetId !== -1 && s.title);
+  }
+
+  async ensureJobSheets(): Promise<void> {
+    const sheets = await this.getSheets();
+    const requests: any[] = [];
+    const job = sheets.find((s) => s.title === "JobInfo");
+    if (job) {
+      if (job.index !== 0) {
+        requests.push({
+          updateSheetProperties: {
+            properties: { sheetId: job.sheetId, index: 0 },
+            fields: "index",
+          },
+        });
+      }
+    } else {
+      if (sheets.length > 0) {
+        const first = sheets[0];
+        requests.push({
+          updateSheetProperties: {
+            properties: { sheetId: first.sheetId, title: "JobInfo", index: 0 },
+            fields: "title,index",
+          },
+        });
+      } else {
+        requests.push({ addSheet: { properties: { title: "JobInfo", index: 0 } } });
+      }
+    }
+
+    const existingTitles = new Set<string>(sheets.map((s) => s.title));
+    if (!existingTitles.has("JobInfo")) existingTitles.add("JobInfo");
+    ["Manifest", "Log"].forEach((title) => {
+      if (!existingTitles.has(title)) {
+        requests.push({ addSheet: { properties: { title } } });
+      }
+    });
+
+    if (requests.length === 0) return;
+    await this.request(":batchUpdate", {
+      method: "POST",
+      body: JSON.stringify({ requests }),
+    });
+  }
 }
 
 export function parseJobInfo(rows: string[][]): JobInfo {
@@ -57,18 +147,7 @@ export function parseJobInfo(rows: string[][]): JobInfo {
     const [key, value] = row;
     if (key) map[key] = value ?? "";
   });
-  const required: Array<keyof JobInfo> = [
-    "job_id",
-    "job_label",
-    "transfer_mode",
-    "manifest_version",
-    "dest_drive_id",
-    "dest_root_id",
-    "manifest_sheet_name",
-    "log_sheet_name",
-    "source_root_id",
-  ];
-  for (const key of required) {
+  for (const key of JOB_INFO_KEYS) {
     if (!map[key]) throw new Error(`JobInfo missing key: ${key}`);
   }
   return map as unknown as JobInfo;
@@ -77,33 +156,14 @@ export function parseJobInfo(rows: string[][]): JobInfo {
 export function parseManifest(rows: string[][]): ManifestRow[] {
   if (rows.length === 0) return [];
   const header = rows[0];
-  const expected = [
-    "id",
-    "name",
-    "mimeType",
-    "parents",
-    "owners",
-    "driveId",
-    "trashed",
-    "shortcut_target_id",
-    "shortcut_target_mimeType",
-    "permissions",
-    "createdTime",
-    "modifiedTime",
-    "dest_parent_id",
-    "dest_drive_id",
-    "status",
-    "worker_session_id",
-    "error",
-  ];
-  if (header.length < expected.length || expected.some((v, i) => header[i] !== v)) {
+  if (header.length < MANIFEST_HEADERS.length || MANIFEST_HEADERS.some((v, i) => header[i] !== v)) {
     throw new Error("Manifest header mismatch");
   }
   const rowsOut: ManifestRow[] = [];
   for (let i = 1; i < rows.length; i++) {
     const row = rows[i];
     const toObj: Record<string, string> = {};
-    expected.forEach((key, idx) => {
+    MANIFEST_HEADERS.forEach((key, idx) => {
       toObj[key] = row[idx] ?? "";
     });
     rowsOut.push(toObj as unknown as ManifestRow);

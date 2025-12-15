@@ -10,11 +10,13 @@ export interface DriveFile {
     targetMimeType: string;
   };
   owners: Array<{ emailAddress?: string }>;
+  createdTime?: string;
+  modifiedTime?: string;
 }
 
 const DRIVE_API = "https://www.googleapis.com/drive/v3";
 const FILE_FIELDS =
-  "id,name,mimeType,parents,driveId,trashed,shortcutDetails(targetId,targetMimeType),owners(emailAddress)";
+  "id,name,mimeType,parents,driveId,trashed,shortcutDetails(targetId,targetMimeType),owners(emailAddress),createdTime,modifiedTime";
 
 export class DriveClient {
   constructor(private readonly accessToken: string) {
@@ -71,6 +73,19 @@ export class DriveClient {
       body: JSON.stringify({
         name,
         mimeType: "application/vnd.google-apps.folder",
+        parents: [parentId],
+        driveId,
+        supportsAllDrives: true,
+      }),
+    });
+  }
+
+  async createSpreadsheet(name: string, parentId: string, driveId: string): Promise<DriveFile> {
+    return this.request<DriveFile>("/files?supportsAllDrives=true", {
+      method: "POST",
+      body: JSON.stringify({
+        name,
+        mimeType: "application/vnd.google-apps.spreadsheet",
         parents: [parentId],
         driveId,
         supportsAllDrives: true,

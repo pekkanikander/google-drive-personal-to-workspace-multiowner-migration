@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Migration Admin (Alpha)</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 24px; max-width: 960px; }
+    fieldset { margin-bottom: 16px; padding: 12px; border: 1px solid #ddd; }
+    label { display: block; margin-bottom: 6px; font-weight: 600; }
+    input, button, textarea { width: 100%; box-sizing: border-box; padding: 8px; margin-bottom: 10px; }
+    .inline { display: flex; gap: 8px; }
+    .inline > input { flex: 1; }
+    .status { white-space: pre-wrap; background: #f7f7f7; padding: 8px; border: 1px solid #eee; min-height: 60px; }
+    .success { color: #0a6; }
+    .error { color: #c00; }
+    code { background: #f0f0f0; padding: 2px 4px; }
+  </style>
+</head>
+<body>
+  <h1>Migration Admin (Alpha)</h1>
+  <p>Move-only, SPA-only alpha. Provide your OAuth client ID and folder URLs to build the manifest.</p>
+
+  <fieldset>
+    <legend>OAuth Client</legend>
+    <label for="oauth-client-id">OAuth Client ID</label>
+    <input id="oauth-client-id" placeholder="e.g. 1234567890-abc.apps.googleusercontent.com">
+    <button id="btn-auth">Sign in</button>
+    <div id="auth-status" class="status"></div>
+  </fieldset>
+
+  <fieldset>
+    <legend>Job inputs</legend>
+    <label for="job-label">Job label</label>
+    <input id="job-label" placeholder="Human-friendly label (e.g. Project X migration)">
+
+    <label for="source-root">Source root folder URL/ID (personal Drive)</label>
+    <input id="source-root" placeholder="https://drive.google.com/drive/folders/...">
+
+    <label for="dest-root">Destination root folder URL/ID (Shared Drive)</label>
+    <input id="dest-root" placeholder="https://drive.google.com/drive/folders/...">
+
+    <label for="user-base-url">User SPA base URL (where user page is hosted)</label>
+    <input id="user-base-url" placeholder="https://your-host/user.html">
+
+    <button id="btn-create">Create job (sheet + manifest)</button>
+  </fieldset>
+
+  <fieldset>
+    <legend>Results</legend>
+    <div id="result" class="status"></div>
+  </fieldset>
+
+  <script type="module" src="./dist/admin.js"></script>
+</body>
+</html>

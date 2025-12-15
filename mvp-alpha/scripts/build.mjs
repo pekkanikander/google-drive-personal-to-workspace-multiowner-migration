@@ -5,7 +5,7 @@ import { dirname, resolve } from "node:path";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = resolve(__dirname, "..");
-const dist = resolve(root, "dist");
+const dist = resolve(root, "public", "dist");
 
 rmSync(dist, { recursive: true, force: true });
 
