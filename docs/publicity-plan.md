@@ -2,6 +2,8 @@
 
 This project solves a recurring and poorly addressed need: migrating multi‑owner content from personal Google Drive folders into Google Workspace Shared Drives. Awareness and discoverability are essential for usefulness. The goal of this publicity plan is to ensure that potential users—admins, IT staff, and technically capable volunteers—can find the tool when searching for migration solutions.
 
+**Alpha constraints to disclose clearly:** move-only, SPA-only (static hosting), Sheets as coordination/log store, manual temporary Shared Drive Manager grants, no cross-device resume, best-effort “fail fast” behaviour on Sheets quotas.
+
 ## 1. Target audience
 
 - Google Workspace administrators.

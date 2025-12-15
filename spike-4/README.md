@@ -30,3 +30,5 @@ python3 -m http.server 8081
 4) Open the page, authenticate, then **Load manifest + start**. Use two different Google accounts in two browser windows for concurrency observation. The app intentionally waits ~1.5s between claim/complete to make overlap visible.
 
 If the sheet is missing expected columns/sheets, the app stops immediately (no backoff/recovery).
+
+Alpha context: this spike aligns with the planned alpha constraints (move-only, SPA-only, Sheets coordination, manual temporary Shared Drive Manager grants, no cross-device resume). Refer to `docs/mvp-alpha-plan.md` for the current plan-of-record once drafted.
