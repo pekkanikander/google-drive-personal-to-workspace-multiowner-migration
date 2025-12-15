@@ -239,3 +239,7 @@ This spike is not concerned with:
 - **OAuth configuration propagation delay.**
   Changes to OAuth client settings (especially authorised origins) may take several minutes to take effect.
   Transient `redirect_uri_mismatch` or similar errors can occur during this window and may resolve without code changes.
+
+### Addition 2025-12-15
+
+- Folders cannot be moved. They give teamDrivesFolderMoveInNotSupported error.

@@ -43,6 +43,8 @@ Common search terms already mapped during earlier research:
 - “copy Google Drive folder structure API”
 - “Google Workspace shared drive migration”
 
+https://stackoverflow.com/questions/65226499/move-a-folder-into-a-team-drive-using-google-drive-api
+
 Actions:
 - Prepare code-backed answers (not self-promotional) explaining concepts that the tool implements (folder tree copying, Drive permission patterns, multi-user migration pitfalls).
 - Where appropriate, include a link to the GitHub repo as a related open-source solution.
@@ -77,6 +79,8 @@ Post content should:
 Focus on reaching IT professionals and open-source communities.
 
 ## 4. SEO / discoverability optimisation
+
+TODO: Error message teamDrivesFolderMoveInNotSupported
 
 ### 4.1 GitHub README keywords
 Include structured phrases:
