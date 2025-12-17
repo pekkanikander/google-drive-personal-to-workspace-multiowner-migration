@@ -1,0 +1,21 @@
+{
+  "name": "drive-populate",
+  "version": "0.0.1",
+  "private": true,
+  "type": "module",
+  "description": "Testing tool to populate personal Google Drive fixtures for migration alpha.",
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "drive:populate": "npm run build --silent && node dist/cli.js",
+    "lint": "tsc --noEmit"
+  },
+  "dependencies": {
+    "google-auth-library": "^9.13.0",
+    "googleapis": "^135.0.0"
+  },
+  "devDependencies": {
+    "@types/node": "^22.9.3",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.6.3"
+  }
+}

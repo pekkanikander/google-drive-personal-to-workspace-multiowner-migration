@@ -1,0 +1,7 @@
+{
+  "name": "google-drive-personal-to-workspace-multiowner-migration",
+  "private": true,
+  "scripts": {
+    "drive:populate": "npm --prefix tools/drive-populate run drive:populate --"
+  }
+}

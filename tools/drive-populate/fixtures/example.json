@@ -1,0 +1,77 @@
+{
+  "accounts": [
+    { "email": "test.a@gmail.com", "label": "A" },
+    { "email": "test.b@gmail.com", "label": "B" },
+    { "email": "test.c@gmail.com", "label": "C" }
+  ],
+  "root": {
+    "name": "MIGRATION-TEST",
+    "children": [
+      {
+        "type": "application/vnd.google-apps.folder",
+        "name": "Mixed-Ownership-Folder",
+        "children": [
+          {
+            "type": "application/vnd.google-apps.document",
+            "name": "doc-by-A",
+            "owner": "A"
+          },
+          {
+            "type": "application/vnd.google-apps.spreadsheet",
+            "name": "sheet-by-B",
+            "owner": "B"
+          },
+          {
+            "type": "application/vnd.google-apps.folder",
+            "name": "Nested-Mixed",
+            "children": [
+              {
+                "type": "application/vnd.google-apps.presentation",
+                "name": "slides-by-C",
+                "owner": "C"
+              },
+              {
+                "type": "application/pdf",
+                "name": "pdf-by-A",
+                "owner": "A",
+                "asset": "tiny.pdf"
+              },
+              {
+                "type": "image/png",
+                "name": "png-by-B",
+                "owner": "B",
+                "asset": "tiny.png"
+              },
+              {
+                "type": "application/zip",
+                "name": "zip-by-C",
+                "owner": "C",
+                "asset": "tiny.zip"
+              }
+            ]
+          }
+        ]
+      },
+      {
+        "type": "application/vnd.google-apps.folder",
+        "name": "Forms-Template-Copy",
+        "owner": "A",
+        "children": [
+          {
+            "type": "copy",
+            "name": "form-copy-1-form",
+            "owner": "A",
+            "sourceId": "<drive-file-id-of-template-form>",
+            "linkResponseSheet": "<drive-file-id-of-sheet-to-link>"
+          },
+          {
+            "type": "copy",
+            "name": "form-copy-1-sheet",
+            "owner": "A",
+            "sourceId": "<drive-file-id-of-template-sheet>"
+          }
+        ]
+      }
+    ]
+  }
+}
