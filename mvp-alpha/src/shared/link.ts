@@ -8,7 +8,7 @@ export interface UserLinkParams {
 }
 
 /**
- * Build a user link carrying sheetId + jobToken either in the fragment (#) or query (?).
+ * Build a user link carrying sheetId + jobToken + clientId in the fragment (#).
  * Keeping parameters in the fragment avoids referrer leakage.
  */
 export function buildUserLink(params: UserLinkParams): string {
@@ -37,10 +37,11 @@ export function normalizeSheetId(input: string): string {
 }
 
 /**
- * Parse a sheet/token pair from URL search or fragment.
+ * Parse a sheet/token pair from a URL fragment.
  */
-export function parseJobLink(searchOrHash: string): { sheetId?: string; jobToken?: string; oauthClientId?: string } {
-  const params = new URLSearchParams(searchOrHash.replace(/^#/, "").replace(/^\?/, ""));
+export function parseJobLink(hash: string): { sheetId?: string; jobToken?: string; oauthClientId?: string } {
+  if (!hash.startsWith("#")) return {};
+  const params = new URLSearchParams(hash.slice(1));
   return {
     sheetId: params.get("sheet") || undefined,
     jobToken: params.get("token") || undefined,

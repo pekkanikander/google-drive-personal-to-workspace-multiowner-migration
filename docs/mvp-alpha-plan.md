@@ -105,7 +105,7 @@ Low frequency: claim + completion per batch, plus skips/failures.
 - Link content is non-secret; real guards are Drive/Sheets ACLs and post-OAuth email verification against the manifest.
 - Include: sheet ID (plain text), and a random job token for obscurity/rotation. Tab names are fixed (`JobInfo`, `Manifest`, `Log`), so they are not passed in the link.
 - Keep sensitive data out of the link (no per-user emails, no credentials). Destination IDs live in the manifest rows (`dest_parent_id`, `dest_drive_id`).
-- Prefer placing parameters in the URL fragment (`#...`) to avoid referrer leakage.
+- Parameters live in the URL fragment (`#...`) only; query strings are not supported.
 - On load: obtain token/sheet from link, run OAuth, fetch job info, then manifest, validate schema, and confirm signed-in email appears in the manifest before proceeding.
 
 ## Error handling and recovery (alpha)

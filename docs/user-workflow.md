@@ -66,11 +66,12 @@ If you need to keep a local backup, make one before the admin schedules the migr
 Your admin will send the user a link that looks something like:
 
 ```
-https://<organisation-domain>/migrate?job=<identifier>&token=<random>
+https://<organisation-domain>/migrate#sheet=<sheet-id>&token=<random>&clientId=<oauth-client-id>
 ```
 
 This link is safe to open.
 It is specific to the organisation’s migration process, not to you personally.
+The parameters live in the URL fragment (`#...`), not in the query string.
 
 You can open the link on any device (computer, phone, tablet) where
 you have logged in or can log into your personal Google account (GMail).
