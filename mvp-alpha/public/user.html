@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Migration User (Alpha)</title>
+  <script src="https://accounts.google.com/gsi/client" async defer></script>
+  <style>
+    body { font-family: system-ui, -apple-system, sans-serif; margin: 24px; max-width: 720px; }
+    .status { white-space: pre-wrap; background: #f7f7f7; padding: 8px; border: 1px solid #eee; min-height: 60px; }
+    .error { color: #c00; }
+    .success { color: #0a6; }
+    button { padding: 10px 14px; font-size: 1rem; }
+  </style>
+</head>
+<body>
+  <h1>Migration User (Alpha)</h1>
+  <p>This page is reached via the admin-provided link. It validates the link, signs you in, and checks the job sheet.</p>
+
+  <div id="status" class="status"></div>
+  <button id="btn-start">Sign in and validate job</button>
+
+  <script type="module" src="./dist/user.js"></script>
+</body>
+</html>
