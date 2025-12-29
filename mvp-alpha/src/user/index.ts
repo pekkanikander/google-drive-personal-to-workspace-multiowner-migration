@@ -1,7 +1,10 @@
 import { TokenClient, fetchUserEmail } from "../shared/auth";
 import { buildRuntimeConfig } from "../shared/config";
+import { DriveClient } from "../shared/drive";
 import { parseJobLink } from "../shared/link";
-import { SheetsClient, MANIFEST_HEADERS, parseJobInfo } from "../shared/sheets";
+import { SheetsClient, MANIFEST_HEADERS, parseJobInfo, parseManifest } from "../shared/sheets";
+import { buildManifestEntries, filterEntriesForOwner, PreparedEntry } from "./manifest";
+import { createRelativePathResolver } from "./paths";
 
 function $(id: string): HTMLElement {
   const el = document.getElementById(id);
@@ -16,11 +19,70 @@ function setStatus(el: HTMLElement, msg: string, type: "info" | "error" | "succe
   if (type === "success") el.classList.add("success");
 }
 
+function setText(id: string, value: string) {
+  const el = document.getElementById(id);
+  if (el) el.textContent = value;
+}
+
+function setListVisible(visible: boolean) {
+  const el = document.getElementById("file-list-container");
+  if (!el) return;
+  el.classList.toggle("hidden", !visible);
+}
+
+function clearFileList() {
+  const list = document.getElementById("file-list") as HTMLOListElement | null;
+  if (list) list.innerHTML = "";
+  setText("file-list-note", "");
+}
+
+function setStats(total: number, moved: number) {
+  setText("stat-total", String(total));
+  setText("stat-moved", String(moved));
+}
+
+function renderFileList(entries: PreparedEntry[], drive: DriveClient, sourceRootId: string) {
+  clearFileList();
+  if (entries.length === 0) {
+    setListVisible(false);
+    return;
+  }
+  setListVisible(true);
+  const list = document.getElementById("file-list") as HTMLOListElement | null;
+  if (!list) return;
+
+  const maxItems = 200;
+  const shown = entries.slice(0, maxItems);
+  const countNote =
+    entries.length > maxItems
+      ? `Showing first ${maxItems} of ${entries.length} files.`
+      : `Showing ${entries.length} files.`;
+  const note = `Paths shown relative to the source root. ${countNote}`;
+  setText("file-list-note", note);
+
+  const resolver = createRelativePathResolver(drive, sourceRootId);
+  shown.forEach((entry) => {
+    const parentId = entry.parents[0] ?? "";
+    const li = document.createElement("li");
+    li.textContent = entry.row.name;
+    list.appendChild(li);
+    void resolver
+      .resolveFilePath(parentId, entry.row.name)
+      .then((path) => {
+        li.textContent = path;
+      })
+      .catch(() => {
+        li.textContent = entry.row.name;
+      });
+  });
+}
+
 async function main() {
   const status = $("status");
   const btn = $("btn-start") as HTMLButtonElement;
 
   let config;
+  let preparedEntries: PreparedEntry[] = [];
   try {
     const parsed = parseJobLink(window.location.hash);
     config = buildRuntimeConfig({ linkFragment: window.location.hash });
@@ -64,9 +126,30 @@ async function main() {
         throw new Error("Manifest header mismatch. Please ask admin to regenerate the manifest.");
       }
 
+      const manifestValues = await sheets.getValues("Manifest");
+      const manifestRows = parseManifest(manifestValues);
+      const entries = buildManifestEntries(manifestRows);
+      const { owned, eligible, multiOwnerCount } = filterEntriesForOwner(entries, email);
+
+      if (owned.length === 0) {
+        setStats(0, 0);
+        setListVisible(false);
+        setStatus(
+          status,
+          `Signed in as ${email}.\nNo files in this manifest are owned by you, so you are not needed for this job.`,
+          "success",
+        );
+        return;
+      }
+
+      preparedEntries = eligible;
+      setStats(preparedEntries.length, 0);
+      const drive = new DriveClient(token.accessToken);
+      renderFileList(preparedEntries, drive, jobInfo.source_root_id);
+
       setStatus(
         status,
-        `Ready.\nJob: ${jobInfo.job_label}\nMode: ${jobInfo.transfer_mode}\nSheet: ${sheetId}\nSigned in as ${email}`,
+        `Ready.\nJob: ${jobInfo.job_label}\nMode: ${jobInfo.transfer_mode}\nSheet: ${sheetId}\nSigned in as ${email}\nYour files: ${owned.length}\nEligible (single-owner): ${eligible.length}\nSkipped (multi-owner): ${multiOwnerCount}\nMoved: 0 (placeholder)`,
         "success",
       );
     } catch (err: any) {
