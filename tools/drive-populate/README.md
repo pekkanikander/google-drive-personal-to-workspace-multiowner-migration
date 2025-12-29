@@ -7,7 +7,7 @@ This tool has been build by Codex / ChatGPT-5.2 without a human reviewing all th
 - **Commands**
   - `auth --account <email> [--chrome-profile-dir <dir>]` — run PKCE + loopback OAuth, store refresh token in `/tmp/$USER/gd-migrate-test/credentials/<email>.json`.
   - `list-accounts` — list stored credentials.
-  - `populate --spec <fixtures/basic.json> --root-id <id> [--verbose]` — populate an existing, pre-shared root folder using the spec.
+  - `populate --spec <fixtures/example.json> --root-id <id> [--verbose]` — populate an existing, pre-shared root folder using the spec.
   - `clean --root-id <id> [--account <email>]` — delete all contents under the root (root itself stays).
 
 - **Env vars**
@@ -23,12 +23,20 @@ This tool has been build by Codex / ChatGPT-5.2 without a human reviewing all th
   - macOS/Linux: uses `open -a "Google Chrome" --args --profile-directory=<dir> <url>` when `--chrome-profile-dir` is provided.
   - Otherwise falls back to `open <url>` (default browser).
 
-- **Run**
+- **Compile and Test**
   ```sh
   cd tools/drive-populate
   npm install
   npm run drive:populate -- --help   # builds to dist/ then runs
   ```
+
+- **Quick recreate script**
+  ```sh
+  tools/drive-populate/recreate-fixture.sh --root-id <id>
+  tools/drive-populate/recreate-fixture.sh --root-id <id> --spec fixtures/<fixture>.json
+  ```
+  The script reads accounts from the spec (including optional `profile`), runs auth for missing accounts,
+  then `clean` + `populate`. If `--spec` is relative, it is resolved against the script directory.
 
 - **Output discipline**
   - Logs go to stderr.
