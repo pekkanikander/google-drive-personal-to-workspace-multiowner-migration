@@ -25,11 +25,13 @@
     .status-ignored { color: #666; }
     .status-started { color: #a66; }
     .status-pending { color: #444; }
+    .build-banner { margin: 12px 0; padding: 8px; border: 1px solid #eee; background: #fafafa; font-size: 0.9rem; }
   </style>
 </head>
 <body>
   <h1>Migration User (Alpha)</h1>
   <p>This page is reached via the admin-provided link. It validates the link, signs you in, and checks the job sheet.</p>
+  <div class="build-banner">Build: <span id="build-time">unknown</span></div>
 
   <div id="status" class="status"></div>
   <section id="step-auth" class="step">

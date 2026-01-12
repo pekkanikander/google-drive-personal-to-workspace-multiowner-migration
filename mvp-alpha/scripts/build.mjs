@@ -27,6 +27,9 @@ const result = await build({
   entryPoints,
   splitting: true,
   chunkNames: "chunks/[name]-[hash]",
+  define: {
+    __BUILD_TIME__: JSON.stringify(new Date().toISOString()),
+  },
   ...sharedOptions,
 });
 

@@ -8,6 +8,8 @@ import { buildManifestEntries, filterEntriesForOwner, PreparedEntry } from "./ma
 import { createRelativePathResolver } from "./paths";
 import { statusRange } from "./ranges";
 
+declare const __BUILD_TIME__: string;
+
 const MIN_MANIFEST_WRITE_MS = 2000;
 const STATUS_CLASSES = ["status-done", "status-failed", "status-ignored", "status-started", "status-pending"];
 
@@ -37,6 +39,13 @@ function $(id: string): HTMLElement {
   const el = document.getElementById(id);
   if (!el) throw new Error(`Missing element #${id}`);
   return el;
+}
+
+function setBuildInfo() {
+  const buildEl = document.getElementById("build-time");
+  if (buildEl) {
+    buildEl.textContent = typeof __BUILD_TIME__ === "string" ? __BUILD_TIME__ : "unknown";
+  }
 }
 
 function setStatus(el: HTMLElement, msg: string, type: "info" | "error" | "success" = "info") {
@@ -245,6 +254,7 @@ function renderFileList(
 }
 
 async function main() {
+  setBuildInfo();
   const status = $("status");
   const btnLoad = $("btn-load") as HTMLButtonElement;
   const btnRun = $("btn-run") as HTMLButtonElement;

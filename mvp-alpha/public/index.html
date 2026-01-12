@@ -16,11 +16,13 @@
     .success { color: #0a6; }
     .error { color: #c00; }
     code { background: #f0f0f0; padding: 2px 4px; }
+    .build-banner { margin: 12px 0; padding: 8px; border: 1px solid #eee; background: #fafafa; font-size: 0.9rem; }
   </style>
 </head>
 <body>
   <h1>Migration Admin (Alpha)</h1>
   <p>Move-only, SPA-only alpha. Provide your OAuth client ID and folder URLs to build the manifest.</p>
+  <div class="build-banner">Build: <span id="build-time">unknown</span></div>
 
   <fieldset>
     <legend>OAuth Client</legend>

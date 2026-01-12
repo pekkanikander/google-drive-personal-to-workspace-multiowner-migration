@@ -12,12 +12,21 @@ import {
 } from "../shared/sheets";
 import { ManifestRow } from "../shared/types";
 
+declare const __BUILD_TIME__: string;
+
 const FOLDER_MIME = "application/vnd.google-apps.folder";
 
 function $(id: string): HTMLElement {
   const el = document.getElementById(id);
   if (!el) throw new Error(`Missing element #${id}`);
   return el;
+}
+
+function setBuildInfo() {
+  const buildEl = document.getElementById("build-time");
+  if (buildEl) {
+    buildEl.textContent = typeof __BUILD_TIME__ === "string" ? __BUILD_TIME__ : "unknown";
+  }
 }
 
 function randomId(prefix: string) {
@@ -110,6 +119,7 @@ async function enumerateAndMirror(opts: {
 }
 
 async function main() {
+  setBuildInfo();
   const oauthInput = $("oauth-client-id") as HTMLInputElement;
   const srcInput = $("source-root") as HTMLInputElement;
   const destInput = $("dest-root") as HTMLInputElement;
