@@ -17,6 +17,12 @@
     .error { color: #c00; }
     code { background: #f0f0f0; padding: 2px 4px; }
     .build-banner { margin: 12px 0; padding: 8px; border: 1px solid #eee; background: #fafafa; font-size: 0.9rem; }
+    .file-list { margin-top: 16px; }
+    .file-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    .file-table th, .file-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; }
+    .file-status { white-space: nowrap; font-weight: 600; }
+    .hidden { display: none; }
+    .muted { color: #666; font-size: 0.9rem; }
   </style>
 </head>
 <body>
@@ -56,6 +62,22 @@
     <legend>Results</legend>
     <div id="result" class="status"></div>
   </fieldset>
+
+  <section id="manifest-list-container" class="file-list hidden">
+    <h2>Manifest list</h2>
+    <div class="muted" id="manifest-list-note"></div>
+    <button id="btn-refresh-manifest" type="button">Refresh list</button>
+    <table class="file-table">
+      <thead>
+        <tr>
+          <th>File</th>
+          <th>Owner</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="manifest-list"></tbody>
+    </table>
+  </section>
 
   <script type="module" src="./dist/admin.js"></script>
 </body>

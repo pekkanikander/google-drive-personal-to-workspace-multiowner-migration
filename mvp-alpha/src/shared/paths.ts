@@ -1,4 +1,4 @@
-import { DriveClient } from "../shared/drive";
+import { DriveClient } from "./drive";
 
 interface FolderMeta {
   name: string;

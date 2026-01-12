@@ -1,4 +1,4 @@
-import { ManifestRow } from "../shared/types";
+import { ManifestRow } from "./types";
 
 export interface PreparedEntry {
   rowIndex: number;

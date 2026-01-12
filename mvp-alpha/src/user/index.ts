@@ -2,22 +2,15 @@ import { TokenClient, fetchUserEmail } from "../shared/auth";
 import { buildRuntimeConfig } from "../shared/config";
 import { DriveClient } from "../shared/drive";
 import { parseJobLink } from "../shared/link";
+import { FileListEntry, FileListRow, renderFileTable, setFileStatus } from "../shared/file-list";
+import { buildManifestEntries, filterEntriesForOwner, PreparedEntry } from "../shared/manifest";
 import { SheetsClient, MANIFEST_HEADERS, buildStatusUpdate, parseJobInfo, parseManifest, serializeLogEntries } from "../shared/sheets";
 import { JobInfo, LogEntry, ManifestStatus } from "../shared/types";
-import { buildManifestEntries, filterEntriesForOwner, PreparedEntry } from "./manifest";
-import { createRelativePathResolver } from "./paths";
 import { statusRange } from "./ranges";
 
 declare const __BUILD_TIME__: string;
 
 const MIN_MANIFEST_WRITE_MS = 2000;
-const STATUS_CLASSES = ["status-done", "status-failed", "status-ignored", "status-started", "status-pending"];
-
-type FileRowUI = {
-  entry: PreparedEntry;
-  statusEl: HTMLElement;
-};
-
 type LoadedState = {
   email: string;
   sessionId: string;
@@ -32,7 +25,7 @@ type LoadedState = {
   pendingEntries: PreparedEntry[];
   ignoredCandidates: PreparedEntry[];
   foreignStarted: PreparedEntry[];
-  fileRows: Map<number, FileRowUI>;
+  fileRows: Map<number, FileListRow>;
 };
 
 function $(id: string): HTMLElement {
@@ -95,21 +88,6 @@ function setStats(total: number, moved: number) {
   setText("stat-moved", String(moved));
 }
 
-function statusClass(label: string): string {
-  const normalized = label.trim().toUpperCase();
-  if (normalized.startsWith("DONE")) return "status-done";
-  if (normalized.startsWith("FAILED")) return "status-failed";
-  if (normalized.startsWith("IGNORED")) return "status-ignored";
-  if (normalized.startsWith("STARTED")) return "status-started";
-  return "status-pending";
-}
-
-function setFileStatus(el: HTMLElement, label: string) {
-  el.textContent = label;
-  STATUS_CLASSES.forEach((name) => el.classList.remove(name));
-  el.classList.add(statusClass(label));
-}
-
 function delay(ms: number): Promise<void> {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
@@ -150,15 +128,15 @@ function isRetryableStatus(status: ManifestStatus): boolean {
 
 function displayStatusForEntry(
   entry: PreparedEntry,
-  sessionId: string,
-  ignoredSet: Set<PreparedEntry>,
-  foreignStartedSet: Set<PreparedEntry>,
+  ignoredSet: Set<number>,
+  foreignStartedSet: Set<number>,
+  ignoreReasonByRow: Map<number, string>,
 ): string {
-  if (ignoredSet.has(entry)) {
-    const reason = ignoreReason(entry);
+  if (ignoredSet.has(entry.rowIndex)) {
+    const reason = ignoreReasonByRow.get(entry.rowIndex);
     return reason ? `IGNORED (${reason})` : "IGNORED";
   }
-  if (foreignStartedSet.has(entry)) {
+  if (foreignStartedSet.has(entry.rowIndex)) {
     const otherSession = entry.row.worker_session_id || "unknown";
     return `FAILED (started by ${otherSession})`;
   }
@@ -169,7 +147,7 @@ function displayStatusForEntry(
   return "PENDING";
 }
 
-function updateEntryStatus(fileRows: Map<number, FileRowUI>, entry: PreparedEntry, label: string) {
+function updateEntryStatus(fileRows: Map<number, FileListRow>, entry: PreparedEntry, label: string) {
   const row = fileRows.get(entry.rowIndex);
   if (!row) return;
   setFileStatus(row.statusEl, label);
@@ -203,54 +181,15 @@ function makeLogEntry(
   };
 }
 
-function renderFileList(
-  entries: PreparedEntry[],
-  drive: DriveClient,
-  sourceRootId: string,
-  statusByRow: Map<number, string>,
-): Map<number, FileRowUI> {
-  clearFileList();
-  if (entries.length === 0) {
-    setListVisible(false);
-    return new Map();
-  }
-  setListVisible(true);
-  const list = document.getElementById("file-list") as HTMLTableSectionElement | null;
-  if (!list) return new Map();
-
-  const maxItems = 200;
-  const shown = entries.slice(0, maxItems);
-  const countNote =
-    entries.length > maxItems
-      ? `Showing first ${maxItems} of ${entries.length} files.`
-      : `Showing ${entries.length} files.`;
-  const note = `Paths shown relative to the source root. ${countNote}`;
-  setText("file-list-note", note);
-
-  const rows = new Map<number, FileRowUI>();
-  const resolver = createRelativePathResolver(drive, sourceRootId);
-  shown.forEach((entry) => {
-    const parentId = entry.parents[0] ?? "";
-    const tr = document.createElement("tr");
-    const pathCell = document.createElement("td");
-    const statusCell = document.createElement("td");
-    pathCell.textContent = entry.row.name;
-    statusCell.classList.add("file-status");
-    setFileStatus(statusCell, statusByRow.get(entry.rowIndex) ?? "PENDING");
-    tr.appendChild(pathCell);
-    tr.appendChild(statusCell);
-    list.appendChild(tr);
-    rows.set(entry.rowIndex, { entry, statusEl: statusCell });
-    void resolver
-      .resolveFilePath(parentId, entry.row.name)
-      .then((path) => {
-        pathCell.textContent = path;
-      })
-      .catch(() => {
-        pathCell.textContent = entry.row.name;
-      });
-  });
-  return rows;
+function toFileListEntry(entry: PreparedEntry): FileListEntry {
+  return {
+    rowIndex: entry.rowIndex,
+    name: entry.row.name,
+    parents: entry.parents,
+    owners: entry.owners,
+    status: entry.row.status,
+    workerSessionId: entry.row.worker_session_id,
+  };
 }
 
 async function main() {
@@ -342,11 +281,13 @@ async function main() {
 
       const drive = new DriveClient(token.accessToken);
       const ignoredCandidates = eligible.filter((entry) => isMultiParent(entry) || isShortcut(entry));
-      const ignoredSet = new Set(ignoredCandidates);
+      const ignoreReasonByRow = new Map<number, string>();
+      ignoredCandidates.forEach((entry) => ignoreReasonByRow.set(entry.rowIndex, ignoreReason(entry)));
+      const ignoredSet = new Set(ignoredCandidates.map((entry) => entry.rowIndex));
       const foreignStarted = eligible.filter((entry) => isForeignStarted(entry, sessionId));
-      const foreignStartedSet = new Set(foreignStarted);
+      const foreignStartedSet = new Set(foreignStarted.map((entry) => entry.rowIndex));
       const runnableEntries = eligible.filter(
-        (entry) => !ignoredSet.has(entry) && !foreignStartedSet.has(entry),
+        (entry) => !ignoredSet.has(entry.rowIndex) && !foreignStartedSet.has(entry.rowIndex),
       );
       const alreadyDone = runnableEntries.filter((entry) => entry.row.status === "DONE").length;
       const pendingEntries = runnableEntries.filter((entry) => isRetryableStatus(entry.row.status));
@@ -356,9 +297,21 @@ async function main() {
       setStats(runnableEntries.length, alreadyDone);
       const statusByRow = new Map<number, string>();
       eligible.forEach((entry) => {
-        statusByRow.set(entry.rowIndex, displayStatusForEntry(entry, sessionId, ignoredSet, foreignStartedSet));
+        statusByRow.set(entry.rowIndex, displayStatusForEntry(entry, ignoredSet, foreignStartedSet, ignoreReasonByRow));
       });
-      const fileRows = renderFileList(eligible, drive, jobInfo.source_root_id, statusByRow);
+      clearFileList();
+      setListVisible(eligible.length > 0);
+      const list = document.getElementById("file-list") as HTMLTableSectionElement | null;
+      const fileRows = list
+        ? renderFileTable({
+            container: list,
+            entries: eligible.map(toFileListEntry),
+            drive,
+            sourceRootId: jobInfo.source_root_id,
+            statusLabelForEntry: (entry) => statusByRow.get(entry.rowIndex) ?? "PENDING",
+            setNote: (note) => setText("file-list-note", note),
+          })
+        : new Map<number, FileListRow>();
 
       const warningMessage =
         foreignStartedCount > 0
@@ -423,14 +376,16 @@ async function main() {
       let lastManifestWriteAt = 0;
       let fatalError: string | null = null;
 
-      const ignoredSet = new Set(ignoredCandidates);
-      const foreignStartedSet = new Set(foreignStarted);
+      const ignoreReasonByRow = new Map<number, string>();
+      ignoredCandidates.forEach((entry) => ignoreReasonByRow.set(entry.rowIndex, ignoreReason(entry)));
+      const ignoredSet = new Set(ignoredCandidates.map((entry) => entry.rowIndex));
+      const foreignStartedSet = new Set(foreignStarted.map((entry) => entry.rowIndex));
 
       let pendingStatusUpdates = ignoredCandidates
         .filter((entry) => !entry.row.status)
         .map((entry) => {
-          const reason = ignoreReason(entry);
-          updateEntryStatus(fileRows, entry, displayStatusForEntry(entry, sessionId, ignoredSet, foreignStartedSet));
+          const reason = ignoreReasonByRow.get(entry.rowIndex) ?? "";
+          updateEntryStatus(fileRows, entry, displayStatusForEntry(entry, ignoredSet, foreignStartedSet, ignoreReasonByRow));
           return makeStatusUpdate(manifestSheetName, entry, "IGNORED", sessionId, reason);
         });
       let pendingLogEntries: LogEntry[] = ignoredCandidates

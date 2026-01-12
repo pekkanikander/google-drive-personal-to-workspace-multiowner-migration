@@ -8,8 +8,11 @@ import {
   MANIFEST_HEADERS,
   SheetsClient,
   parseJobInfo,
+  parseManifest,
   serializeJobInfo,
 } from "../shared/sheets";
+import { FileListEntry, renderFileTable } from "../shared/file-list";
+import { buildManifestEntries, PreparedEntry } from "../shared/manifest";
 import { ManifestRow } from "../shared/types";
 
 declare const __BUILD_TIME__: string;
@@ -27,6 +30,43 @@ function setBuildInfo() {
   if (buildEl) {
     buildEl.textContent = typeof __BUILD_TIME__ === "string" ? __BUILD_TIME__ : "unknown";
   }
+}
+
+function setListVisible(visible: boolean) {
+  const el = document.getElementById("manifest-list-container");
+  if (!el) return;
+  el.classList.toggle("hidden", !visible);
+}
+
+function setListNote(text: string) {
+  const el = document.getElementById("manifest-list-note");
+  if (!el) return;
+  el.textContent = text;
+}
+
+function clearManifestList() {
+  const list = document.getElementById("manifest-list") as HTMLTableSectionElement | null;
+  if (list) list.innerHTML = "";
+  setListNote("");
+}
+
+function toFileListEntry(entry: PreparedEntry): FileListEntry {
+  return {
+    rowIndex: entry.rowIndex,
+    name: entry.row.name,
+    parents: entry.parents,
+    owners: entry.owners,
+    status: entry.row.status,
+    workerSessionId: entry.row.worker_session_id,
+  };
+}
+
+function adminStatusLabel(entry: FileListEntry): string {
+  if (!entry.status) return "PENDING";
+  if (entry.status === "STARTED" && entry.workerSessionId) {
+    return `STARTED (${entry.workerSessionId})`;
+  }
+  return entry.status;
 }
 
 function randomId(prefix: string) {
@@ -130,8 +170,40 @@ async function main() {
   const result = $("result");
   const btnAuth = $("btn-auth") as HTMLButtonElement;
   const btnCreate = $("btn-create") as HTMLButtonElement;
+  const btnRefresh = $("btn-refresh-manifest") as HTMLButtonElement;
 
   let cachedToken: { accessToken: string; email: string } | null = null;
+  let manifestContext: {
+    drive: DriveClient;
+    sheets: SheetsClient;
+    sourceRootId: string;
+    manifestSheetName: string;
+  } | null = null;
+
+  btnRefresh.disabled = true;
+
+  const refreshManifestList = async () => {
+    if (!manifestContext) return;
+    const { drive, sheets, sourceRootId, manifestSheetName } = manifestContext;
+    clearManifestList();
+    const manifestValues = await sheets.getValues(manifestSheetName);
+    const manifestRows = parseManifest(manifestValues);
+    const entries = buildManifestEntries(manifestRows);
+    const list = document.getElementById("manifest-list") as HTMLTableSectionElement | null;
+    if (!list) return;
+    const fileEntries = entries.map(toFileListEntry);
+    renderFileTable({
+      container: list,
+      entries: fileEntries,
+      drive,
+      sourceRootId,
+      statusLabelForEntry: adminStatusLabel,
+      ownerLabelForEntry: (entry) => entry.owners.join("; "),
+      showOwner: true,
+      setNote: setListNote,
+    });
+    setListVisible(entries.length > 0);
+  };
 
   btnAuth.onclick = async () => {
     authStatus.textContent = "Signing in...";
@@ -223,6 +295,15 @@ async function main() {
         { range: logRange, values: [Array.from(LOG_HEADERS)] },
       ]);
 
+      manifestContext = {
+        drive,
+        sheets,
+        sourceRootId: sourceId,
+        manifestSheetName: jobInfo.manifest_sheet_name || "Manifest",
+      };
+      btnRefresh.disabled = false;
+      await refreshManifestList();
+
       const userLink = buildUserLink({
         baseUrl: userBaseInput.value.trim(),
         sheetId,
@@ -238,6 +319,17 @@ async function main() {
         <div>User link:</div>
         <textarea rows="3">${userLink}</textarea>
       `;
+    } catch (err: any) {
+      result.innerHTML = `<span class="error">Error: ${err?.message || err}</span>`;
+    }
+  };
+
+  btnRefresh.onclick = async () => {
+    if (!manifestContext) return;
+    result.textContent = "Refreshing manifest list...";
+    try {
+      await refreshManifestList();
+      result.textContent = "Manifest list refreshed.";
     } catch (err: any) {
       result.innerHTML = `<span class="error">Error: ${err?.message || err}</span>`;
     }

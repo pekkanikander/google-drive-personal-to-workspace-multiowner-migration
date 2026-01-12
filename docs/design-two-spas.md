@@ -10,7 +10,7 @@ In this model:
 
 - **Admin SPA** prepares the job (enumeration, destination folders, ACLs, manifest).
 - **User SPA** performs the actual per‑user transfer using the user’s own OAuth token.
-- Shared state (manifest, progress, logs) is stored in Google Drive (typically the destination Shared Drive) using normal Drive files and ACLs.
+- Shared state is stored in Google Drive (alpha uses a Google Sheet; later variants use Drive files with ACLs).
 
 This keeps deployment close to “static hosting + OAuth client”, while still enabling robust, resumable migrations.
 
@@ -67,7 +67,10 @@ Without a backend, the system still needs shared, durable state. This variant us
 
   `Shared Drive / Migration Jobs / <job-id>/`
 
-- The job folder contains:
+- **Alpha (current implementation):** the job folder contains a single Google Sheet (e.g. `<job-name> manifest`)
+  with `JobInfo`, `Manifest`, and `Log` tabs. This spreadsheet is the coordination layer.
+
+- **Later variant (planned):** the job folder contains:
 
   - `manifest.json` (admin‑written, user‑read)
   - `users/<email>/progress.json` (user‑written, admin‑read)
@@ -76,11 +79,11 @@ Without a backend, the system still needs shared, durable state. This variant us
 
 ### ACL rules (later)
 
-- `manifest.json`:
+- `manifest.json` (later variant):
   - readable by all participating personal users
   - writable only by admin (and optionally service account if used)
 
-- `users/<email>/`:
+- `users/<email>/` (later variant):
   - writable by that personal user
   - readable by admin
   - not writable by other users
@@ -105,7 +108,7 @@ This intentionally trades security for speed of delivery in alpha. Later version
 - Enumerate the source folder tree:
   - create the destination folder structure
   - build a per‑owner work plan
-- Generate and write `manifest.json`.
+- Generate and write the manifest (Manifest sheet in alpha).
 - Provision per‑user destination folders and ACLs.
 - Provide per‑user entry links to the User SPA.
 
@@ -118,7 +121,7 @@ This intentionally trades security for speed of delivery in alpha. Later version
 ### Outputs
 
 - Destination folder tree (folders only initially).
-- `manifest.json` and per‑user target folder IDs.
+- Manifest sheet (alpha) and per‑user target folder IDs.
 - Per‑user destination ACLs.
 - A set of user links (URL + job id + optional user hint).
 
@@ -144,7 +147,7 @@ The manifest is treated as immutable for a job run (append‑only reports can be
 - Verify eligibility:
   - user email exists in manifest
 - Execute the configured transfer mode for that user’s file set.
-- Write progress to `users/<email>/progress.json`.
+- Write progress to the manifest/log sheets (alpha).
 
 ### Transfer semantics
 
@@ -154,14 +157,16 @@ The manifest is treated as immutable for a job run (append‑only reports can be
 
 ### Progress tracking
 
-Store per‑task state such as:
+Alpha (Sheets‑backed):
 
-- `pending | in_progress | done | failed`
-- last error (code/message)
-- timestamps
+- Manifest rows store `status`, `worker_session_id`, and `error`.
+- Log entries are appended to the `Log` sheet.
+- On reload, the SPA re‑reads the manifest sheet and resumes from pending/failed items.
+- Rows marked `STARTED` by another session are left untouched and flagged for admin follow‑up.
 
-Progress should support resuming:
+Later variant (JSON files):
 
+- Store per‑task state such as `pending | in_progress | done | failed`, error details, and timestamps.
 - On page reload, the SPA reads `progress.json` and continues from the next pending item.
 
 Alpha note (Sheets-backed):
@@ -213,8 +218,8 @@ The install documentation should aim for the least confusing admin experience.
 
 ### Manifest integrity
 
-- Users must not be able to edit `manifest.json`.
-- User progress files must be isolated per user.
+- Users must not be able to edit the manifest (sheet or JSON file).
+- User progress files (later variant) must be isolated per user.
 
 ---
 
@@ -233,10 +238,7 @@ The install documentation should aim for the least confusing admin experience.
 - No central queue/worker without adding a backend.
 - Quota/rate limiting is distributed across user browsers; retry logic must be robust client-side
   - (and account for broad Manager access in alpha).
- - Admin dashboard aggregates state by scanning per-user progress files.
-
- ---
-- Admin dashboard aggregates state by scanning per‑user progress files.
+- Admin dashboard aggregates state by scanning the manifest/log sheets (alpha) or per‑user progress files (later).
 
 ---
 
