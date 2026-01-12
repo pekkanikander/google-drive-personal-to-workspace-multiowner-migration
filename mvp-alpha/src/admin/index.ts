@@ -115,6 +115,7 @@ async function main() {
   const destInput = $("dest-root") as HTMLInputElement;
   const labelInput = $("job-label") as HTMLInputElement;
   const userBaseInput = $("user-base-url") as HTMLInputElement;
+  const batchInput = $("batch-size") as HTMLInputElement;
   const authStatus = $("auth-status");
   const result = $("result");
   const btnAuth = $("btn-auth") as HTMLButtonElement;
@@ -156,6 +157,11 @@ async function main() {
       const jobId = randomId("job_");
       const jobToken = randomId("token_");
       const jobLabel = labelInput.value.trim() || "Migration job";
+      const batchRaw = batchInput.value.trim();
+      const batchSize = batchRaw ? Number(batchRaw) : 1;
+      if (!Number.isFinite(batchSize) || batchSize < 1) {
+        throw new Error("Batch size must be a positive number.");
+      }
 
       const dateStr = new Date().toISOString().slice(0, 10);
       const jobFolderName = `File-Migration-${dateStr}`;
@@ -189,6 +195,7 @@ async function main() {
         manifest_sheet_name: "Manifest",
         log_sheet_name: "Log",
         source_root_id: sourceId,
+        batch_size: String(Math.floor(batchSize)),
       };
       const jobPairs = serializeJobInfo(jobInfo);
       jobPairs.push({ key: "job_token", value: jobToken });

@@ -16,7 +16,7 @@ This addendum captures alpha-specific constraints; remove or revise as we progre
 - Temporary Shared Drive Manager access during migration; revoked afterward.
 - Keep the browser tab open; resume only works on the same browser and device.
   If the tab crashes, reopen on the same device using the same browser to continue; cross-device resume is not supported.
-- The app skips multi-owner rows and only processes files owned by the signed-in user.
+- The app skips multi-owner rows, multi-parent items, and shortcuts; it only processes files owned by the signed-in user.
 - Errors/quotas surface as “fail fast”; retry after a pause or as instructed by the admin.
 
 ---

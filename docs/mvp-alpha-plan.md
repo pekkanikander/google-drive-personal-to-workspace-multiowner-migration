@@ -47,8 +47,9 @@ Key/value metadata (two columns: `key`, `value`). Canonical keys for alpha:
 - `manifest_version` — e.g. `v1`.
 - `dest_drive_id` — Shared Drive ID.
 - `dest_root_id` — root folder ID within the destination Shared Drive for this job.
-- `manifest_sheet_name` — fixed to `Manifest`.
-- `log_sheet_name` — fixed to `Log`.
+- `manifest_sheet_name` — sheet name used for the manifest (default `Manifest`).
+- `log_sheet_name` — sheet name used for the log (default `Log`).
+- `batch_size` — number of files claimed per batch (default `1` if missing).
 
 ### Manifest schema (Sheet: `Manifest`)
 
@@ -67,14 +68,15 @@ Columns (header row, fixed order; uppercase here for clarity):
 - `modifiedTime`
 - `dest_parent_id` (destination parent in Shared Drive; required for move)
 - `dest_drive_id` (destination drive ID; optional if implied by parent)
-- `status` (empty | `STARTED` | `DONE` | `FAILED` (optional))
+- `status` (empty | `STARTED` | `DONE` | `FAILED` | `IGNORED`)
 - `worker_session_id` (string; used for stale detection/reclaim)
 - `error` (optional human-readable note on failure)
 
 Rules:
 - Admin SPA writes all columns except `status`, `worker_session_id`, `error`.
 - User SPA writes only `status`, `worker_session_id`, and optionally `error`.
-- Multi-owner rows and shortcuts are left untouched in alpha; logged as skipped.
+- Multi-owner rows are left untouched in alpha; logged as skipped.
+- Multi-parent rows and shortcuts are marked `IGNORED` with a reason.
 - No rows are added/deleted while runs are active; row order must remain stable.
 
 ### Log sheet (`Log`)

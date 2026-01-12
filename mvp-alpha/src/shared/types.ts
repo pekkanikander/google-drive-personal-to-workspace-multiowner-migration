@@ -1,6 +1,6 @@
 export type TransferMode = "move";
 
-export type ManifestStatus = "" | "STARTED" | "DONE" | "FAILED";
+export type ManifestStatus = "" | "STARTED" | "DONE" | "FAILED" | "IGNORED";
 
 export interface JobInfo {
   job_id: string;
@@ -12,6 +12,7 @@ export interface JobInfo {
   manifest_sheet_name: string;
   log_sheet_name: string;
   source_root_id: string;
+  batch_size?: string;
   // consider storing oauth_client_id if desired for traceability
 }
 

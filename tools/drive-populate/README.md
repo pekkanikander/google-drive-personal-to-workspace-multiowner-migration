@@ -4,6 +4,21 @@ Creates and rebuilds small mixed-ownership fixtures in personal Google Drive for
 
 This tool has been build by Codex / ChatGPT-5.2 without a human reviewing all the code.  There may be LLM generated bugs.
 
+### Quick start
+
+1. Export the desktop app info from `../../.env`
+```
+export TEST_TOOL_GOOGLE_OAUTH_CLIENT_ID="<id>.apps.googleusercontent.com"
+export TEST_TOOL_GOOGLE_OAUTH_CLIENT_ID="<secret>"
+```
+2. Make a new Google Docs folder on a private drive.  Use the folder-id as the root `id` below.
+3. Re-create the fixture in Google Drive
+```
+  ./recreate-fixture.sh --root-id <id> [--spec <path>] [--verbose]
+```
+
+### Details
+
 - **Commands**
   - `auth --account <email> [--chrome-profile-dir <dir>]` — run PKCE + loopback OAuth, store refresh token in `/tmp/$USER/gd-migrate-test/credentials/<email>.json`.
   - `list-accounts` — list stored credentials.

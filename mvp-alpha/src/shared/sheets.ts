@@ -74,12 +74,14 @@ export class SheetsClient {
   }
 
   async append(range: string, values: string[][]): Promise<void> {
-    await this.request(`/values/${encodeURIComponent(range)}:append`, {
+    const params = new URLSearchParams({
+      valueInputOption: "RAW",
+      insertDataOption: "INSERT_ROWS",
+    });
+    await this.request(`/values/${encodeURIComponent(range)}:append?${params.toString()}`, {
       method: "POST",
       body: JSON.stringify({
         values,
-        valueInputOption: "RAW",
-        insertDataOption: "INSERT_ROWS",
       }),
     });
   }
