@@ -176,7 +176,7 @@ For each file owned by the user:
 
 - The Web app performs the job’s configured transfer mode under **user credentials**.
 - Destination parent is always the Workspace Shared Drive folder that corresponds to the source folder.
-- Errors (quota, rate limit, permissions) are logged and retried when appropriate.
+- Errors (quota, rate limit, permissions) are logged. Alpha fails fast and resumes on reload; automatic retries are deferred.
 - Completed operations are marked in the manifest, allowing intelligent recovery and continuation.
 
 No ownership transfer occurs; Google strictly prohibits that for personal → Workspace files.

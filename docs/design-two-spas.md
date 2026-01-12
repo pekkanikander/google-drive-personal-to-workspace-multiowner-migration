@@ -164,6 +164,11 @@ Progress should support resuming:
 
 - On page reload, the SPA reads `progress.json` and continues from the next pending item.
 
+Alpha note (Sheets-backed):
+
+- The SPA loads status directly from the manifest sheet; on any error it stops and the user restarts from the load step.
+- Rows marked STARTED by another session are treated as blocked and left unchanged for admin follow-up.
+
 ---
 
 ## Hosting and deployment

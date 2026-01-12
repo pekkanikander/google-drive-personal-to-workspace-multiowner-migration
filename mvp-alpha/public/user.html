@@ -14,8 +14,17 @@
     .stats { margin: 16px 0; padding: 8px; border: 1px solid #eee; background: #fafafa; }
     .muted { color: #666; font-size: 0.9rem; }
     .file-list { margin-top: 16px; }
-    .file-list ol { padding-left: 22px; }
     .hidden { display: none; }
+    .step { margin: 16px 0; padding: 8px; border: 1px solid #eee; background: #fafafa; }
+    .warning { background: #fff4d6; border: 1px solid #f0d18c; padding: 8px; margin: 8px 0; color: #7a4b00; }
+    .file-table { width: 100%; border-collapse: collapse; margin-top: 8px; }
+    .file-table th, .file-table td { text-align: left; padding: 6px 8px; border-bottom: 1px solid #eee; }
+    .file-status { white-space: nowrap; font-weight: 600; }
+    .status-done { color: #0a6; }
+    .status-failed { color: #c00; }
+    .status-ignored { color: #666; }
+    .status-started { color: #a66; }
+    .status-pending { color: #444; }
   </style>
 </head>
 <body>
@@ -23,6 +32,15 @@
   <p>This page is reached via the admin-provided link. It validates the link, signs you in, and checks the job sheet.</p>
 
   <div id="status" class="status"></div>
+  <section id="step-auth" class="step">
+    <h2>Step 1: Authenticate and load job</h2>
+    <button id="btn-load">Sign in and load job</button>
+  </section>
+  <section id="step-run" class="step hidden">
+    <h2>Step 2: Move your files</h2>
+    <div id="resume-warning" class="warning hidden"></div>
+    <button id="btn-run">Move files</button>
+  </section>
   <div class="stats">
     <div><strong>Files to move:</strong> <span id="stat-total">-</span></div>
     <div><strong>Moved:</strong> <span id="stat-moved">0</span></div>
@@ -30,9 +48,16 @@
   <section id="file-list-container" class="file-list hidden">
     <h2>Files to move</h2>
     <div id="file-list-note" class="muted">Paths shown relative to the source root.</div>
-    <ol id="file-list"></ol>
+    <table class="file-table">
+      <thead>
+        <tr>
+          <th>File</th>
+          <th>Status</th>
+        </tr>
+      </thead>
+      <tbody id="file-list"></tbody>
+    </table>
   </section>
-  <button id="btn-start">Sign in and validate job</button>
 
   <script type="module" src="./dist/user.js"></script>
 </body>

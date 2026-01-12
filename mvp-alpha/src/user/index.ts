@@ -3,12 +3,35 @@ import { buildRuntimeConfig } from "../shared/config";
 import { DriveClient } from "../shared/drive";
 import { parseJobLink } from "../shared/link";
 import { SheetsClient, MANIFEST_HEADERS, buildStatusUpdate, parseJobInfo, parseManifest, serializeLogEntries } from "../shared/sheets";
-import { LogEntry, ManifestStatus } from "../shared/types";
+import { JobInfo, LogEntry, ManifestStatus } from "../shared/types";
 import { buildManifestEntries, filterEntriesForOwner, PreparedEntry } from "./manifest";
 import { createRelativePathResolver } from "./paths";
 import { statusRange } from "./ranges";
 
 const MIN_MANIFEST_WRITE_MS = 2000;
+const STATUS_CLASSES = ["status-done", "status-failed", "status-ignored", "status-started", "status-pending"];
+
+type FileRowUI = {
+  entry: PreparedEntry;
+  statusEl: HTMLElement;
+};
+
+type LoadedState = {
+  email: string;
+  sessionId: string;
+  sheetId: string;
+  jobInfo: JobInfo;
+  drive: DriveClient;
+  sheets: SheetsClient;
+  manifestSheetName: string;
+  logSheetName: string;
+  batchSize: number;
+  runnableEntries: PreparedEntry[];
+  pendingEntries: PreparedEntry[];
+  ignoredCandidates: PreparedEntry[];
+  foreignStarted: PreparedEntry[];
+  fileRows: Map<number, FileRowUI>;
+};
 
 function $(id: string): HTMLElement {
   const el = document.getElementById(id);
@@ -28,6 +51,24 @@ function setText(id: string, value: string) {
   if (el) el.textContent = value;
 }
 
+function setVisible(id: string, visible: boolean) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  el.classList.toggle("hidden", !visible);
+}
+
+function setWarning(id: string, message: string) {
+  const el = document.getElementById(id);
+  if (!el) return;
+  if (!message) {
+    el.textContent = "";
+    el.classList.add("hidden");
+    return;
+  }
+  el.textContent = message;
+  el.classList.remove("hidden");
+}
+
 function setListVisible(visible: boolean) {
   const el = document.getElementById("file-list-container");
   if (!el) return;
@@ -35,7 +76,7 @@ function setListVisible(visible: boolean) {
 }
 
 function clearFileList() {
-  const list = document.getElementById("file-list") as HTMLOListElement | null;
+  const list = document.getElementById("file-list") as HTMLTableSectionElement | null;
   if (list) list.innerHTML = "";
   setText("file-list-note", "");
 }
@@ -43,6 +84,21 @@ function clearFileList() {
 function setStats(total: number, moved: number) {
   setText("stat-total", String(total));
   setText("stat-moved", String(moved));
+}
+
+function statusClass(label: string): string {
+  const normalized = label.trim().toUpperCase();
+  if (normalized.startsWith("DONE")) return "status-done";
+  if (normalized.startsWith("FAILED")) return "status-failed";
+  if (normalized.startsWith("IGNORED")) return "status-ignored";
+  if (normalized.startsWith("STARTED")) return "status-started";
+  return "status-pending";
+}
+
+function setFileStatus(el: HTMLElement, label: string) {
+  el.textContent = label;
+  STATUS_CLASSES.forEach((name) => el.classList.remove(name));
+  el.classList.add(statusClass(label));
 }
 
 function delay(ms: number): Promise<void> {
@@ -74,6 +130,42 @@ function ignoreReason(entry: PreparedEntry): string {
   return reasons.join("; ");
 }
 
+function isForeignStarted(entry: PreparedEntry, sessionId: string): boolean {
+  if (entry.row.status !== "STARTED") return false;
+  return entry.row.worker_session_id !== sessionId;
+}
+
+function isRetryableStatus(status: ManifestStatus): boolean {
+  return status === "" || status === "FAILED" || status === "STARTED";
+}
+
+function displayStatusForEntry(
+  entry: PreparedEntry,
+  sessionId: string,
+  ignoredSet: Set<PreparedEntry>,
+  foreignStartedSet: Set<PreparedEntry>,
+): string {
+  if (ignoredSet.has(entry)) {
+    const reason = ignoreReason(entry);
+    return reason ? `IGNORED (${reason})` : "IGNORED";
+  }
+  if (foreignStartedSet.has(entry)) {
+    const otherSession = entry.row.worker_session_id || "unknown";
+    return `FAILED (started by ${otherSession})`;
+  }
+  if (entry.row.status === "DONE") return "DONE";
+  if (entry.row.status === "FAILED") return "FAILED";
+  if (entry.row.status === "IGNORED") return "IGNORED";
+  if (entry.row.status === "STARTED") return "STARTED (retry)";
+  return "PENDING";
+}
+
+function updateEntryStatus(fileRows: Map<number, FileRowUI>, entry: PreparedEntry, label: string) {
+  const row = fileRows.get(entry.rowIndex);
+  if (!row) return;
+  setFileStatus(row.statusEl, label);
+}
+
 function makeStatusUpdate(
   sheetName: string,
   entry: PreparedEntry,
@@ -102,15 +194,20 @@ function makeLogEntry(
   };
 }
 
-function renderFileList(entries: PreparedEntry[], drive: DriveClient, sourceRootId: string) {
+function renderFileList(
+  entries: PreparedEntry[],
+  drive: DriveClient,
+  sourceRootId: string,
+  statusByRow: Map<number, string>,
+): Map<number, FileRowUI> {
   clearFileList();
   if (entries.length === 0) {
     setListVisible(false);
-    return;
+    return new Map();
   }
   setListVisible(true);
-  const list = document.getElementById("file-list") as HTMLOListElement | null;
-  if (!list) return;
+  const list = document.getElementById("file-list") as HTMLTableSectionElement | null;
+  if (!list) return new Map();
 
   const maxItems = 200;
   const shown = entries.slice(0, maxItems);
@@ -121,26 +218,36 @@ function renderFileList(entries: PreparedEntry[], drive: DriveClient, sourceRoot
   const note = `Paths shown relative to the source root. ${countNote}`;
   setText("file-list-note", note);
 
+  const rows = new Map<number, FileRowUI>();
   const resolver = createRelativePathResolver(drive, sourceRootId);
   shown.forEach((entry) => {
     const parentId = entry.parents[0] ?? "";
-    const li = document.createElement("li");
-    li.textContent = entry.row.name;
-    list.appendChild(li);
+    const tr = document.createElement("tr");
+    const pathCell = document.createElement("td");
+    const statusCell = document.createElement("td");
+    pathCell.textContent = entry.row.name;
+    statusCell.classList.add("file-status");
+    setFileStatus(statusCell, statusByRow.get(entry.rowIndex) ?? "PENDING");
+    tr.appendChild(pathCell);
+    tr.appendChild(statusCell);
+    list.appendChild(tr);
+    rows.set(entry.rowIndex, { entry, statusEl: statusCell });
     void resolver
       .resolveFilePath(parentId, entry.row.name)
       .then((path) => {
-        li.textContent = path;
+        pathCell.textContent = path;
       })
       .catch(() => {
-        li.textContent = entry.row.name;
+        pathCell.textContent = entry.row.name;
       });
   });
+  return rows;
 }
 
 async function main() {
   const status = $("status");
-  const btn = $("btn-start") as HTMLButtonElement;
+  const btnLoad = $("btn-load") as HTMLButtonElement;
+  const btnRun = $("btn-run") as HTMLButtonElement;
 
   let config;
   try {
@@ -152,12 +259,27 @@ async function main() {
     setStatus(status, `Link OK. Sheet: ${parsed.sheetId}`);
   } catch (err: any) {
     setStatus(status, `Invalid or missing link parameters: ${err?.message || err}`, "error");
-    btn.disabled = true;
+    btnLoad.disabled = true;
+    btnRun.disabled = true;
     return;
   }
 
-  btn.onclick = async () => {
-    btn.disabled = true;
+  let loaded: LoadedState | null = null;
+
+  const resetRunState = () => {
+    loaded = null;
+    btnRun.disabled = true;
+    setVisible("step-run", false);
+    setWarning("resume-warning", "");
+  };
+
+  resetRunState();
+
+  btnLoad.onclick = async () => {
+    btnLoad.disabled = true;
+    btnRun.disabled = true;
+    setVisible("step-run", false);
+    setWarning("resume-warning", "");
     setStatus(status, "Signing in...");
     try {
       if (!(window as any).google) throw new Error("Google Identity Services script not loaded.");
@@ -167,7 +289,7 @@ async function main() {
       });
       const token = await tokenClient.getToken();
       const email = await fetchUserEmail(token.accessToken);
-      setStatus(status, `Signed in as ${email}. Validating job...`);
+      setStatus(status, `Signed in as ${email}. Loading job...`);
 
       const sheetId = config.sheetId!;
       const jobToken = config.jobToken!;
@@ -204,32 +326,101 @@ async function main() {
           `Signed in as ${email}.\nNo files in this manifest are owned by you, so you are not needed for this job.`,
           "success",
         );
+        resetRunState();
         return;
       }
 
       const drive = new DriveClient(token.accessToken);
       const ignoredCandidates = eligible.filter((entry) => isMultiParent(entry) || isShortcut(entry));
       const ignoredSet = new Set(ignoredCandidates);
-      const runnableEntries = eligible.filter((entry) => !ignoredSet.has(entry));
+      const foreignStarted = eligible.filter((entry) => isForeignStarted(entry, sessionId));
+      const foreignStartedSet = new Set(foreignStarted);
+      const runnableEntries = eligible.filter(
+        (entry) => !ignoredSet.has(entry) && !foreignStartedSet.has(entry),
+      );
       const alreadyDone = runnableEntries.filter((entry) => entry.row.status === "DONE").length;
-      const pendingEntries = runnableEntries.filter((entry) => entry.row.status === "");
+      const pendingEntries = runnableEntries.filter((entry) => isRetryableStatus(entry.row.status));
       const ignoredCount = ignoredCandidates.length;
+      const foreignStartedCount = foreignStarted.length;
 
       setStats(runnableEntries.length, alreadyDone);
-      renderFileList(runnableEntries, drive, jobInfo.source_root_id);
+      const statusByRow = new Map<number, string>();
+      eligible.forEach((entry) => {
+        statusByRow.set(entry.rowIndex, displayStatusForEntry(entry, sessionId, ignoredSet, foreignStartedSet));
+      });
+      const fileRows = renderFileList(eligible, drive, jobInfo.source_root_id, statusByRow);
+
+      const warningMessage =
+        foreignStartedCount > 0
+          ? `Some files are marked STARTED by another session. These are skipped and shown as failed. Please contact the admin.`
+          : "";
+      setWarning("resume-warning", warningMessage);
 
       setStatus(
         status,
-        `Ready.\nJob: ${jobInfo.job_label}\nMode: ${jobInfo.transfer_mode}\nSheet: ${sheetId}\nSigned in as ${email}\nYour files: ${owned.length}\nEligible (single-owner): ${eligible.length}\nSkipped (multi-owner): ${multiOwnerCount}\nIgnored (multi-parent/shortcut): ${ignoredCount}\nBatch size: ${batchSize}\nMoved: ${alreadyDone}`,
+        `Ready.\nJob: ${jobInfo.job_label}\nMode: ${jobInfo.transfer_mode}\nSheet: ${sheetId}\nSigned in as ${email}\nYour files: ${owned.length}\nEligible (single-owner): ${eligible.length}\nSkipped (multi-owner): ${multiOwnerCount}\nIgnored (multi-parent/shortcut): ${ignoredCount}\nBlocked (other session): ${foreignStartedCount}\nBatch size: ${batchSize}\nMoved: ${alreadyDone}`,
         "success",
       );
 
-      let movedCount = alreadyDone;
+      loaded = {
+        email,
+        sessionId,
+        sheetId,
+        jobInfo,
+        drive,
+        sheets,
+        manifestSheetName,
+        logSheetName,
+        batchSize,
+        runnableEntries,
+        pendingEntries,
+        ignoredCandidates,
+        foreignStarted,
+        fileRows,
+      };
+      btnRun.disabled = false;
+      setVisible("step-run", true);
+    } catch (err: any) {
+      setStatus(status, `Error: ${err?.message || err}`, "error");
+      resetRunState();
+    } finally {
+      btnLoad.disabled = false;
+    }
+  };
+
+  btnRun.onclick = async () => {
+    if (!loaded) return;
+    btnRun.disabled = true;
+    btnLoad.disabled = true;
+    try {
+      const {
+        email,
+        sessionId,
+        drive,
+        sheets,
+        jobInfo,
+        manifestSheetName,
+        logSheetName,
+        batchSize,
+        runnableEntries,
+        pendingEntries,
+        ignoredCandidates,
+        foreignStarted,
+        fileRows,
+      } = loaded;
+
+      let movedCount = runnableEntries.filter((entry) => entry.row.status === "DONE").length;
       let lastManifestWriteAt = 0;
+      let fatalError: string | null = null;
+
+      const ignoredSet = new Set(ignoredCandidates);
+      const foreignStartedSet = new Set(foreignStarted);
+
       let pendingStatusUpdates = ignoredCandidates
         .filter((entry) => !entry.row.status)
         .map((entry) => {
           const reason = ignoreReason(entry);
+          updateEntryStatus(fileRows, entry, displayStatusForEntry(entry, sessionId, ignoredSet, foreignStartedSet));
           return makeStatusUpdate(manifestSheetName, entry, "IGNORED", sessionId, reason);
         });
       let pendingLogEntries: LogEntry[] = ignoredCandidates
@@ -273,7 +464,10 @@ async function main() {
 
       while (true) {
         const batch = queue.splice(0, batchSize);
-        const claimUpdates = batch.map((entry) => makeStatusUpdate(manifestSheetName, entry, "STARTED", sessionId));
+        const claimUpdates = batch.map((entry) => {
+          updateEntryStatus(fileRows, entry, "STARTED");
+          return makeStatusUpdate(manifestSheetName, entry, "STARTED", sessionId);
+        });
         if (pendingStatusUpdates.length === 0 && claimUpdates.length === 0) {
           break;
         }
@@ -300,6 +494,9 @@ async function main() {
             if (result.status === "DONE") {
               movedCount += 1;
               setStats(runnableEntries.length, movedCount);
+              updateEntryStatus(fileRows, entry, "DONE");
+            } else {
+              updateEntryStatus(fileRows, entry, "FAILED");
             }
             const details = result.details ?? result.error;
             const event = result.status === "DONE" ? "COMPLETE" : "FAIL";
@@ -307,29 +504,46 @@ async function main() {
               makeStatusUpdate(manifestSheetName, entry, result.status, sessionId, result.error),
             );
             batchLogs.push(makeLogEntry(event, entry, email, sessionId, details));
+            if (result.status === "FAILED") {
+              fatalError = result.error ?? "Move failed.";
+              break;
+            }
           } catch (err: any) {
             const message = err?.message || String(err);
             batchStatusUpdates.push(makeStatusUpdate(manifestSheetName, entry, "FAILED", sessionId, message));
             batchLogs.push(makeLogEntry("FAIL", entry, email, sessionId, message));
-            setStatus(status, `Error: ${message}`, "error");
+            updateEntryStatus(fileRows, entry, "FAILED");
+            fatalError = message;
+            break;
           }
         }
 
         pendingStatusUpdates = batchStatusUpdates;
         pendingLogEntries = batchLogs;
+
+        if (fatalError) {
+          break;
+        }
       }
 
       await flushStatusUpdates(pendingStatusUpdates);
       await flushLogEntries(pendingLogEntries);
+
+      if (fatalError) {
+        throw new Error(fatalError);
+      }
 
       setStatus(
         status,
         `Completed.\nJob: ${jobInfo.job_label}\nMoved: ${movedCount} of ${runnableEntries.length}`,
         "success",
       );
+      btnRun.disabled = true;
     } catch (err: any) {
-      setStatus(status, `Error: ${err?.message || err}`, "error");
-      btn.disabled = false;
+      setStatus(status, `Error: ${err?.message || err}\nRestart from Step 1.`, "error");
+      resetRunState();
+    } finally {
+      btnLoad.disabled = false;
     }
   };
 }
