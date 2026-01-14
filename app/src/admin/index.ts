@@ -180,6 +180,14 @@ async function main() {
     manifestSheetName: string;
   } | null = null;
 
+  if (!userBaseInput.value.trim()) {
+    try {
+      userBaseInput.value = new URL("user.html", window.location.href).toString();
+    } catch {
+      // Ignore URL parse errors; user can enter manually.
+    }
+  }
+
   btnRefresh.disabled = true;
 
   const refreshManifestList = async () => {
