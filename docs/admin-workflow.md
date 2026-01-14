@@ -15,8 +15,8 @@ This addendum captures alpha-specific constraints; remove or revise as we progre
 - Two SPAs on static hosting; no backend/service account required for the user flow.
 - Coordination via a Google Sheet with fixed tabs: `JobInfo` (key/value), `Manifest`, `Log`.
 - Temporary manual Shared Drive Manager grants for participating users; revoke manually when done.
-- User SPA link carries sheet ID + random job token (non-secret); tab names are fixed.
-- User SPA resumes only on the same device; crashes/quotas are “fail fast” and require manual retry; stuck STARTED rows are cleared manually in the sheet.
+- User SPA link carries sheet ID + OAuth client ID + random job token (non-secret); tab names are fixed.
+- User SPA resumes only on the same device (local journal); crashes/quotas are “fail fast” and require manual retry; stuck STARTED rows from other sessions are cleared manually in the sheet.
 - Move idempotency pattern: check live parents first; if already in destination, skip; else PATCH with fresh `removeParents` from a GET.
 
 ---

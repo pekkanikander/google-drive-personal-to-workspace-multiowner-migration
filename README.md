@@ -9,7 +9,7 @@
 **Purpose:** Provide a documented, open-source tool and workflow for migrating **multi-owner** content
 from **personal Google Drive** into a **single Google Workspace Shared Drive**.
 
-This project defines a clean migration architecture and now includes an MVP alpha (see `mvp-alpha/`).
+This project defines a clean migration architecture and now includes an MVP alpha (see `app/`).
 
 ## Overview
 
@@ -74,11 +74,11 @@ This tool may or may not reach beta maturity; usefulness will determine developm
 
 - Architecture design in progress; see [Design overview](docs/design-overview.md) for details.
 - Documentation drafted before implementation, updated as alpha features land.
-- MVP alpha implemented in `mvp-alpha/`:
+- MVP alpha implemented in `app/`:
   - Two SPAs (Admin + User), static hosting, OAuth in browser.
   - Coordination via a single Google Sheet with `JobInfo`, `Manifest`, and `Log` tabs.
   - Move-only transfer mode; copy modes remain deferred.
-  - User SPA resumes by reloading and re-reading the manifest; Admin SPA can refresh a manifest list view.
+  - User SPA resumes on the same device/browser using a local journal; Admin SPA can refresh a manifest list view.
 - Key risks are tracked in [docs/risks.md](docs/risks.md).
 
 ## Contributing

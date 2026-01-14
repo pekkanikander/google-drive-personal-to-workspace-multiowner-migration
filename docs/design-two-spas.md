@@ -32,7 +32,7 @@ This keeps deployment close to “static hosting + OAuth client”, while still 
 For the alpha implementation, the following simplifying choices apply:
 
 - **Coordination database:** all shared state is stored as ordinary Drive files inside the destination Shared Drive (no Firestore / backend DB).
-- **Destination access (temporary):** each participating personal user is granted **temporary Shared Drive Manager** access to complete their migration. After that user’s migration is complete, the tool revokes that access by default (unless the admin chooses to keep it).
+- **Destination access (temporary):** each participating personal user is granted **temporary Shared Drive Manager** access to complete their migration. After that user’s migration is complete, the admin revokes that access manually (unless they choose to keep it).
 - **Scope:** migrate only items that are actual files in the source tree (including Google Forms and their response destinations). Do **not** attempt to migrate shortcuts, “shared with me” items, or other indirect references.
 - **Permission sanitising:** optional post-migration sanitising that drops file-level ACLs is deferred to late-alpha / pre-beta.
 
@@ -93,7 +93,7 @@ This avoids a central writable file shared across users.
 For alpha, the simplest workable model is used, instead of the one above:
 
 - Participating personal users receive **temporary Shared Drive Manager** access during their migration window.
-- The tool revokes that access by default once the user’s file set is complete (unless the admin opts out).
+- The admin revokes that access manually once the user’s file set is complete (unless they opt out).
 
 This intentionally trades security for speed of delivery in alpha. Later versions should move towards per-user destination subtrees and narrower roles.
 
@@ -161,7 +161,7 @@ Alpha (Sheets‑backed):
 
 - Manifest rows store `status`, `worker_session_id`, and `error`.
 - Log entries are appended to the `Log` sheet.
-- On reload, the SPA re‑reads the manifest sheet and resumes from pending/failed items.
+- On reload (same device/browser), the SPA re‑reads the manifest sheet, reuses the stored session ID, and resumes from pending/failed items and STARTED rows for that session.
 - Rows marked `STARTED` by another session are left untouched and flagged for admin follow‑up.
 
 Later variant (JSON files):
@@ -211,7 +211,7 @@ The install documentation should aim for the least confusing admin experience.
 
 ### Destination write boundary
 
-- **Alpha:** users are granted temporary Shared Drive Manager access, then revoked by default after completion.
+- **Alpha:** users are granted temporary Shared Drive Manager access, then revoked manually after completion.
 - **Later, maybe:** restrict users to a constrained destination subtree (per-user roots) and narrower roles.
   - Users must only receive write access to a constrained destination subtree.
   - Prefer per‑user destination roots; avoid granting users broad Shared Drive access.

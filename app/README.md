@@ -11,7 +11,7 @@ What’s next:
 
 Build:
 ```sh
-cd mvp-alpha
+cd app
 npm install
 npm run build   # emits public/dist/admin.js and public/dist/user.js
 npm run check   # type-check only

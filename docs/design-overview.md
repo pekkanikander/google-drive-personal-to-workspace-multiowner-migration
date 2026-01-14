@@ -116,7 +116,7 @@ A crucial insight here is that for each separate file owner in the shared person
 there needs to be a separate session, with a separate OAuth provided personal user identity.
 
 The system generates a **migration link** for the job.
-The link contains a random job token (not an authentication secret) and directs users to a simple web page that:
+The link carries the sheet ID, the OAuth client ID, and a random job token (not an authentication secret) and directs users to a simple web page that:
 
 - Explains the migration.
 - Asks the user to log in with their personal Google account.
@@ -168,7 +168,13 @@ Moves keep IDs intact, so downstream references/bookmarks continue to work; the 
 ### Idempotency approach (moves vs. copies)
 
 - **Move:** treat as “effectively idempotent” by reading live parents first. If the file is already in the destination drive/parent, treat as done. Otherwise, issue `PATCH files/{id}` with `supportsAllDrives=true`, `addParents=<dest_parent_id>`, and `removeParents=<current parents from the fresh GET>`. Do not reuse stale `removeParents` values. Retries re-run the same check+patch, avoiding duplicates.
-- **Copy / move+restore copy:** `files.copy` always creates a new ID; retries will duplicate unless the destination IDs are recorded. Later modes must track `dest_file_id` (and `restore_copy_id`) in the manifest and skip if they already exist under the expected parent. There is no API-level idempotency token for copy.
+- **Copy / move+restore copy:**
+  `files.copy` always creates a new ID; retries will duplicate unless the destination IDs are recorded.
+  Later modes must track `dest_file_id` (and `restore_copy_id`) in the manifest and skip
+  if they already exist under the expected parent.
+  There is no API-level idempotency token for copy.
+  To mitigate the "lost response" race, the copy request should include `appProperties` (e.g. `migration_job_id`, `migration_source_id`),
+  saallowing a later query to locate an existing copy by these keys if the response is dropped.
 
 ### 4. Content Transfer to Workspace
 
@@ -176,7 +182,7 @@ For each file owned by the user:
 
 - The Web app performs the job’s configured transfer mode under **user credentials**.
 - Destination parent is always the Workspace Shared Drive folder that corresponds to the source folder.
-- Errors (quota, rate limit, permissions) are logged. Alpha fails fast and resumes on reload; automatic retries are deferred.
+- Errors (quota, rate limit, permissions) are logged. Alpha fails fast and resumes on reload in the same browser/device via a local journal; automatic retries are deferred.
 - Completed operations are marked in the manifest, allowing intelligent recovery and continuation.
 
 No ownership transfer occurs; Google strictly prohibits that for personal → Workspace files.
@@ -193,7 +199,7 @@ The admin console shows:
 - How many files per user are migrated / pending / failed.
 - Logs for troubleshooting.
 - Coordination store: shared durable state is stored as Drive files (manifest/progress/logs) in the destination Shared Drive.
-- Destination access: personal users may be granted temporary Shared Drive Manager access during migration, to be revoked by default upon completion.
+- Destination access: personal users may be granted temporary Shared Drive Manager access during migration, to be revoked manually upon completion.
 
 - Optionally (later), the ability to re‑request failed operations.
 

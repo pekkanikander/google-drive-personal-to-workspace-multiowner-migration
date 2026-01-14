@@ -1,6 +1,7 @@
 import { TokenClient, fetchUserEmail } from "../shared/auth";
 import { buildRuntimeConfig } from "../shared/config";
 import { DriveClient } from "../shared/drive";
+import { Journal } from "../shared/journal";
 import { parseJobLink } from "../shared/link";
 import { FileListEntry, FileListRow, renderFileTable, setFileStatus } from "../shared/file-list";
 import { buildManifestEntries, filterEntriesForOwner, PreparedEntry } from "../shared/manifest";
@@ -14,10 +15,12 @@ const MIN_MANIFEST_WRITE_MS = 2000;
 type LoadedState = {
   email: string;
   sessionId: string;
+  sessionKey: string;
   sheetId: string;
   jobInfo: JobInfo;
   drive: DriveClient;
   sheets: SheetsClient;
+  journal: Journal;
   manifestSheetName: string;
   logSheetName: string;
   batchSize: number;
@@ -26,6 +29,39 @@ type LoadedState = {
   ignoredCandidates: PreparedEntry[];
   foreignStarted: PreparedEntry[];
   fileRows: Map<number, FileListRow>;
+  recoveredStatusUpdates: StatusUpdateIntent[];
+  recoveredLogEntries: LogIntent[];
+};
+
+type JournalSessionPayload = {
+  sessionKey: string;
+  sessionId: string;
+  createdAt: string;
+};
+
+type JournalStatusPayload = {
+  sessionKey: string;
+  rowIndex: number;
+  status: ManifestStatus;
+  error?: string;
+};
+
+type JournalLogPayload = {
+  sessionKey: string;
+  rowIndex: number;
+  event: string;
+};
+
+type StatusUpdateIntent = {
+  update: { range: string; values: string[][] };
+  rowIndex: number;
+  status: ManifestStatus;
+  error?: string;
+};
+
+type LogIntent = {
+  entry: LogEntry;
+  rowIndex: number;
 };
 
 function $(id: string): HTMLElement {
@@ -100,6 +136,41 @@ function parseBatchSize(value: string | undefined): number {
 
 function randomSessionId(): string {
   return `session_${Math.random().toString(36).slice(2, 10)}`;
+}
+
+function buildSessionKey(sheetId: string, jobToken: string): string {
+  return `${sheetId}:${jobToken}`;
+}
+
+function sessionEntryId(sessionKey: string): string {
+  return `session:${sessionKey}`;
+}
+
+function makeIntentId(kind: "status" | "log", sessionKey: string, rowIndex: number): string {
+  const suffix = Math.random().toString(36).slice(2, 8);
+  return `${kind}:${sessionKey}:${rowIndex}:${Date.now()}:${suffix}`;
+}
+
+function isSessionPayload(value: unknown): value is JournalSessionPayload {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.sessionKey === "string" && typeof record.sessionId === "string";
+}
+
+function isStatusPayload(value: unknown): value is JournalStatusPayload {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.sessionKey === "string" &&
+    typeof record.rowIndex === "number" &&
+    typeof record.status === "string"
+  );
+}
+
+function isLogPayload(value: unknown): value is JournalLogPayload {
+  if (!value || typeof value !== "object") return false;
+  const record = value as Record<string, unknown>;
+  return typeof record.sessionKey === "string" && typeof record.rowIndex === "number" && typeof record.event === "string";
 }
 
 function isShortcut(entry: PreparedEntry): boolean {
@@ -181,6 +252,34 @@ function makeLogEntry(
   };
 }
 
+function createStatusIntent(
+  sheetName: string,
+  entry: PreparedEntry,
+  status: ManifestStatus,
+  sessionId: string,
+  error?: string,
+): StatusUpdateIntent {
+  return {
+    update: makeStatusUpdate(sheetName, entry, status, sessionId, error),
+    rowIndex: entry.rowIndex,
+    status,
+    error,
+  };
+}
+
+function createLogIntent(
+  event: string,
+  entry: PreparedEntry,
+  userEmail: string,
+  sessionId: string,
+  details?: string,
+): LogIntent {
+  return {
+    entry: makeLogEntry(event, entry, userEmail, sessionId, details),
+    rowIndex: entry.rowIndex,
+  };
+}
+
 function toFileListEntry(entry: PreparedEntry): FileListEntry {
   return {
     rowIndex: entry.rowIndex,
@@ -197,6 +296,7 @@ async function main() {
   const status = $("status");
   const btnLoad = $("btn-load") as HTMLButtonElement;
   const btnRun = $("btn-run") as HTMLButtonElement;
+  const journal = new Journal();
 
   let config;
   try {
@@ -242,6 +342,23 @@ async function main() {
 
       const sheetId = config.sheetId!;
       const jobToken = config.jobToken!;
+      const sessionKey = buildSessionKey(sheetId, jobToken);
+      const journalEntries = await journal.getAll();
+      const sessionRecord = journalEntries.find((entry) => {
+        return entry.id === sessionEntryId(sessionKey) && entry.kind === "session" && isSessionPayload(entry.payload);
+      });
+      const sessionId = sessionRecord ? (sessionRecord.payload as JournalSessionPayload).sessionId : randomSessionId();
+      if (!sessionRecord) {
+        await journal.put({
+          id: sessionEntryId(sessionKey),
+          kind: "session",
+          payload: {
+            sessionKey,
+            sessionId,
+            createdAt: new Date().toISOString(),
+          } satisfies JournalSessionPayload,
+        });
+      }
       const sheets = new SheetsClient(token.accessToken, sheetId);
       const jobRows = await sheets.getValues("JobInfo!A1:B50");
       const tokenRow = jobRows.find((r) => r[0] === "job_token");
@@ -252,7 +369,16 @@ async function main() {
       const manifestSheetName = jobInfo.manifest_sheet_name || "Manifest";
       const logSheetName = jobInfo.log_sheet_name || "Log";
       const batchSize = parseBatchSize(jobInfo.batch_size);
-      const sessionId = randomSessionId();
+      const intentEntries = journalEntries.filter((entry) => {
+        if (entry.kind === "status") {
+          return isStatusPayload(entry.payload) && entry.payload.sessionKey === sessionKey;
+        }
+        if (entry.kind === "log") {
+          return isLogPayload(entry.payload) && entry.payload.sessionKey === sessionKey;
+        }
+        return false;
+      });
+      const intentIds = intentEntries.map((entry) => entry.id);
 
       const manifestHeader = await sheets.getValues(`${manifestSheetName}!1:1`);
       const header = manifestHeader[0] ?? [];
@@ -280,6 +406,50 @@ async function main() {
       }
 
       const drive = new DriveClient(token.accessToken);
+      const entryByRowIndex = new Map<number, PreparedEntry>();
+      eligible.forEach((entry) => entryByRowIndex.set(entry.rowIndex, entry));
+      const pendingRowIndices = new Set<number>();
+      intentEntries.forEach((entry) => {
+        if (entry.kind === "status" && isStatusPayload(entry.payload)) {
+          pendingRowIndices.add(entry.payload.rowIndex);
+        } else if (entry.kind === "log" && isLogPayload(entry.payload)) {
+          pendingRowIndices.add(entry.payload.rowIndex);
+        }
+      });
+      const recoveredStatusUpdates: StatusUpdateIntent[] = [];
+      const recoveredLogEntries: LogIntent[] = [];
+      if (pendingRowIndices.size > 0) {
+        setStatus(status, `Recovering ${pendingRowIndices.size} pending item(s)...`);
+        for (const rowIndex of pendingRowIndices) {
+          const entry = entryByRowIndex.get(rowIndex);
+          if (!entry) continue;
+          if (isMultiParent(entry) || isShortcut(entry)) continue;
+          if (entry.row.status === "DONE" || entry.row.status === "IGNORED") continue;
+          const fileId = entry.row.id;
+          const destParentId = entry.row.dest_parent_id;
+          if (!fileId || !destParentId) {
+            const message = "missing file id or destination parent";
+            entry.row.status = "FAILED";
+            entry.row.worker_session_id = sessionId;
+            entry.row.error = message;
+            recoveredStatusUpdates.push(createStatusIntent(manifestSheetName, entry, "FAILED", sessionId, message));
+            recoveredLogEntries.push(createLogIntent("FAIL", entry, email, sessionId, message));
+            continue;
+          }
+          const file = await drive.getFile(fileId);
+          const parents = file.parents ?? [];
+          if (parents.includes(destParentId)) {
+            entry.row.status = "DONE";
+            entry.row.worker_session_id = sessionId;
+            entry.row.error = "";
+            recoveredStatusUpdates.push(createStatusIntent(manifestSheetName, entry, "DONE", sessionId));
+            recoveredLogEntries.push(createLogIntent("COMPLETE", entry, email, sessionId, "recovered"));
+          }
+        }
+      }
+      if (intentIds.length > 0) {
+        await journal.remove(intentIds);
+      }
       const ignoredCandidates = eligible.filter((entry) => isMultiParent(entry) || isShortcut(entry));
       const ignoreReasonByRow = new Map<number, string>();
       ignoredCandidates.forEach((entry) => ignoreReasonByRow.set(entry.rowIndex, ignoreReason(entry)));
@@ -328,10 +498,12 @@ async function main() {
       loaded = {
         email,
         sessionId,
+        sessionKey,
         sheetId,
         jobInfo,
         drive,
         sheets,
+        journal,
         manifestSheetName,
         logSheetName,
         batchSize,
@@ -340,6 +512,8 @@ async function main() {
         ignoredCandidates,
         foreignStarted,
         fileRows,
+        recoveredStatusUpdates,
+        recoveredLogEntries,
       };
       btnRun.disabled = false;
       setVisible("step-run", true);
@@ -359,9 +533,11 @@ async function main() {
       const {
         email,
         sessionId,
+        sessionKey,
         drive,
         sheets,
         jobInfo,
+        journal,
         manifestSheetName,
         logSheetName,
         batchSize,
@@ -370,6 +546,8 @@ async function main() {
         ignoredCandidates,
         foreignStarted,
         fileRows,
+        recoveredStatusUpdates,
+        recoveredLogEntries,
       } = loaded;
 
       let movedCount = runnableEntries.filter((entry) => entry.row.status === "DONE").length;
@@ -381,32 +559,95 @@ async function main() {
       const ignoredSet = new Set(ignoredCandidates.map((entry) => entry.rowIndex));
       const foreignStartedSet = new Set(foreignStarted.map((entry) => entry.rowIndex));
 
-      let pendingStatusUpdates = ignoredCandidates
-        .filter((entry) => !entry.row.status)
-        .map((entry) => {
-          const reason = ignoreReasonByRow.get(entry.rowIndex) ?? "";
-          updateEntryStatus(fileRows, entry, displayStatusForEntry(entry, ignoredSet, foreignStartedSet, ignoreReasonByRow));
-          return makeStatusUpdate(manifestSheetName, entry, "IGNORED", sessionId, reason);
-        });
-      let pendingLogEntries: LogEntry[] = ignoredCandidates
-        .filter((entry) => !entry.row.status)
-        .map((entry) => makeLogEntry("IGNORED", entry, email, sessionId, ignoreReason(entry)));
+      let pendingStatusUpdates: StatusUpdateIntent[] = [
+        ...recoveredStatusUpdates,
+        ...ignoredCandidates
+          .filter((entry) => !entry.row.status)
+          .map((entry) => {
+            const reason = ignoreReasonByRow.get(entry.rowIndex) ?? "";
+            updateEntryStatus(fileRows, entry, displayStatusForEntry(entry, ignoredSet, foreignStartedSet, ignoreReasonByRow));
+            return createStatusIntent(manifestSheetName, entry, "IGNORED", sessionId, reason);
+          }),
+      ];
+      let pendingLogEntries: LogIntent[] = [
+        ...recoveredLogEntries,
+        ...ignoredCandidates
+          .filter((entry) => !entry.row.status)
+          .map((entry) => createLogIntent("IGNORED", entry, email, sessionId, ignoreReason(entry))),
+      ];
 
       const queue = pendingEntries.slice();
 
-      const flushStatusUpdates = async (updates: Array<{ range: string; values: string[][] }>) => {
+      const recordStatusIntents = async (updates: StatusUpdateIntent[]): Promise<string[]> => {
+        if (updates.length === 0) return [];
+        const ids = updates.map((update) => makeIntentId("status", sessionKey, update.rowIndex));
+        try {
+          await Promise.all(
+            updates.map((update, index) =>
+              journal.put({
+                id: ids[index],
+                kind: "status",
+                payload: {
+                  sessionKey,
+                  rowIndex: update.rowIndex,
+                  status: update.status,
+                  error: update.error,
+                } satisfies JournalStatusPayload,
+              }),
+            ),
+          );
+        } catch (err) {
+          console.warn("Journal write failed; proceeding without persisted intents.", err);
+          return [];
+        }
+        return ids;
+      };
+
+      const recordLogIntents = async (entriesToFlush: LogIntent[]): Promise<string[]> => {
+        if (entriesToFlush.length === 0) return [];
+        const ids = entriesToFlush.map((entry) => makeIntentId("log", sessionKey, entry.rowIndex));
+        try {
+          await Promise.all(
+            entriesToFlush.map((entry, index) =>
+              journal.put({
+                id: ids[index],
+                kind: "log",
+                payload: {
+                  sessionKey,
+                  rowIndex: entry.rowIndex,
+                  event: entry.entry.event,
+                } satisfies JournalLogPayload,
+              }),
+            ),
+          );
+        } catch (err) {
+          console.warn("Journal write failed; proceeding without persisted intents.", err);
+          return [];
+        }
+        return ids;
+      };
+
+      const flushStatusUpdates = async (updates: StatusUpdateIntent[]) => {
         if (updates.length === 0) return;
         const elapsed = Date.now() - lastManifestWriteAt;
         if (elapsed < MIN_MANIFEST_WRITE_MS) {
           await delay(MIN_MANIFEST_WRITE_MS - elapsed);
         }
-        await sheets.batchUpdate(updates);
+        const journalIds = await recordStatusIntents(updates);
+        await sheets.batchUpdate(updates.map((update) => update.update));
         lastManifestWriteAt = Date.now();
+        if (journalIds.length > 0) {
+          await journal.remove(journalIds);
+        }
       };
 
-      const flushLogEntries = async (entriesToFlush: LogEntry[]) => {
+      const flushLogEntries = async (entriesToFlush: LogIntent[]) => {
         if (entriesToFlush.length === 0) return;
-        await sheets.append(`${logSheetName}!A1`, serializeLogEntries(entriesToFlush));
+        const journalIds = await recordLogIntents(entriesToFlush);
+        await sheets.append(`${logSheetName}!A1`, serializeLogEntries(entriesToFlush.map((entry) => entry.entry)));
+        if (journalIds.length > 0) {
+          await journal.remove(journalIds);
+        }
       };
 
       const processEntry = async (entry: PreparedEntry) => {
@@ -431,14 +672,15 @@ async function main() {
         const batch = queue.splice(0, batchSize);
         const claimUpdates = batch.map((entry) => {
           updateEntryStatus(fileRows, entry, "STARTED");
-          return makeStatusUpdate(manifestSheetName, entry, "STARTED", sessionId);
+          return createStatusIntent(manifestSheetName, entry, "STARTED", sessionId);
         });
+        const claimLogs = batch.map((entry) => createLogIntent("CLAIM", entry, email, sessionId));
         if (pendingStatusUpdates.length === 0 && claimUpdates.length === 0) {
           break;
         }
 
         await flushStatusUpdates([...pendingStatusUpdates, ...claimUpdates]);
-        await flushLogEntries(pendingLogEntries);
+        await flushLogEntries([...pendingLogEntries, ...claimLogs]);
         pendingStatusUpdates = [];
         pendingLogEntries = [];
 
@@ -446,8 +688,8 @@ async function main() {
           break;
         }
 
-        const batchStatusUpdates: Array<{ range: string; values: string[][] }> = [];
-        const batchLogs: LogEntry[] = [];
+        const batchStatusUpdates: StatusUpdateIntent[] = [];
+        const batchLogs: LogIntent[] = [];
 
         for (const entry of batch) {
           setStatus(
@@ -465,18 +707,16 @@ async function main() {
             }
             const details = result.details ?? result.error;
             const event = result.status === "DONE" ? "COMPLETE" : "FAIL";
-            batchStatusUpdates.push(
-              makeStatusUpdate(manifestSheetName, entry, result.status, sessionId, result.error),
-            );
-            batchLogs.push(makeLogEntry(event, entry, email, sessionId, details));
+            batchStatusUpdates.push(createStatusIntent(manifestSheetName, entry, result.status, sessionId, result.error));
+            batchLogs.push(createLogIntent(event, entry, email, sessionId, details));
             if (result.status === "FAILED") {
               fatalError = result.error ?? "Move failed.";
               break;
             }
           } catch (err: any) {
             const message = err?.message || String(err);
-            batchStatusUpdates.push(makeStatusUpdate(manifestSheetName, entry, "FAILED", sessionId, message));
-            batchLogs.push(makeLogEntry("FAIL", entry, email, sessionId, message));
+            batchStatusUpdates.push(createStatusIntent(manifestSheetName, entry, "FAILED", sessionId, message));
+            batchLogs.push(createLogIntent("FAIL", entry, email, sessionId, message));
             updateEntryStatus(fileRows, entry, "FAILED");
             fatalError = message;
             break;

@@ -6,14 +6,14 @@ const DB_VERSION = 1;
 
 export interface JournalEntry {
   id: string; // unique key
-  kind: "status" | "log";
+  kind: "session" | "status" | "log";
   payload: unknown;
 }
 
 export class Journal {
   private dbPromise: Promise<IDBDatabase>;
 
-  constructor(private readonly name = "mvp-alpha-journal", private readonly store = "entries") {
+  constructor(private readonly name = "app-journal", private readonly store = "entries") {
     this.dbPromise = this.open();
   }
 

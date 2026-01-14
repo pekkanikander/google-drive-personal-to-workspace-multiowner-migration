@@ -12,8 +12,8 @@ All technical complexity is handled by the Workspace administrator and the migra
 This addendum captures alpha-specific constraints; remove or revise as we progress beyond alpha:
 - Move-only; copy and move+restore deferred.
 - Two SPAs on static hosting; no backend for user flow.
-- Coordination via Google Sheet tabs `JobInfo`, `Manifest`, `Log`; link carries sheet ID + job token (non-secret).
-- Temporary Shared Drive Manager access during migration; revoked afterward.
+- Coordination via Google Sheet tabs `JobInfo`, `Manifest`, `Log`; link carries sheet ID + OAuth client ID + job token (non-secret).
+- Temporary Shared Drive Manager access during migration; revoked manually afterward.
 - Keep the browser tab open; resume only works on the same browser and device.
   If the tab crashes, reopen on the same device using the same browser to continue; cross-device resume is not supported.
 - The app skips multi-owner rows, multi-parent items, and shortcuts; it only processes files owned by the signed-in user.
@@ -40,8 +40,8 @@ Once you authorise the migration app:
 - Only **files you personally own** within the **shared personal folder** are processed.
   - Any of your files outside of the shared folder will not be touched.
 - Files are moved or copied into the appropriate folder structure in the organisation’s Workspace Shared Drive.
-- The web page indicates when you may close the browser; the migration may continue in the background.
-- By reopening the link, you will see a status page.
+- Keep the browser tab open while files move. If the tab closes, you can resume on the same device and browser.
+- Reopening the link on the same device and browser shows current status and lets you continue.  Switching over to another device or browser is not supported.
 
 No ownership transfer occurs — Google does not allow that across personal → Workspace migration.
 All behaviour is implemented with Drive’s normal move/copy operations.
@@ -73,8 +73,7 @@ This link is safe to open.
 It is specific to the organisation’s migration process, not to you personally.
 The parameters live in the URL fragment (`#...`), not in the query string.
 
-You can open the link on any device (computer, phone, tablet) where
-you have logged in or can log into your personal Google account (GMail).
+You can open the link on any device to begin, but to resume (if needed) you must use the same device and browser.
 
 ---
 
