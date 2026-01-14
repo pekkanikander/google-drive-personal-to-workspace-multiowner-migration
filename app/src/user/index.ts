@@ -297,6 +297,12 @@ async function main() {
   const btnLoad = $("btn-load") as HTMLButtonElement;
   const btnRun = $("btn-run") as HTMLButtonElement;
   const journal = new Journal();
+  const LOAD_LABEL_DEFAULT = "Sign in and load job";
+  const LOAD_LABEL_ANOTHER = "Sign in as another user and load job";
+
+  const setLoadButtonLabel = (label: string) => {
+    btnLoad.textContent = label;
+  };
 
   let config;
   try {
@@ -320,15 +326,18 @@ async function main() {
     btnRun.disabled = true;
     setVisible("step-run", false);
     setWarning("resume-warning", "");
+    setLoadButtonLabel(LOAD_LABEL_DEFAULT);
   };
 
   resetRunState();
 
   btnLoad.onclick = async () => {
+    let keepDisabled = false;
     btnLoad.disabled = true;
     btnRun.disabled = true;
     setVisible("step-run", false);
     setWarning("resume-warning", "");
+    setLoadButtonLabel(LOAD_LABEL_DEFAULT);
     setStatus(status, "Signing in...");
     try {
       if (!(window as any).google) throw new Error("Google Identity Services script not loaded.");
@@ -517,11 +526,12 @@ async function main() {
       };
       btnRun.disabled = false;
       setVisible("step-run", true);
+      keepDisabled = true;
     } catch (err: any) {
       setStatus(status, `Error: ${err?.message || err}`, "error");
       resetRunState();
     } finally {
-      btnLoad.disabled = false;
+      btnLoad.disabled = keepDisabled;
     }
   };
 
@@ -744,6 +754,8 @@ async function main() {
         "success",
       );
       btnRun.disabled = true;
+      btnLoad.disabled = false;
+      setLoadButtonLabel(LOAD_LABEL_ANOTHER);
     } catch (err: any) {
       setStatus(status, `Error: ${err?.message || err}\nRestart from Step 1.`, "error");
       resetRunState();
