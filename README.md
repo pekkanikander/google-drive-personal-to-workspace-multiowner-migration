@@ -1,15 +1,13 @@
-
-
 # Google Drive Personal → Workspace Multi-Owner Migration Tool
 
 (google-drive-personal-to-workspace-multiowner-migration)
 
-**Status:** Early Alpha (v0.1 target)
+**Status:** Early Alpha (v0.1+)
 
 **Purpose:** Provide a documented, open-source tool and workflow for migrating **multi-owner** content
 from **personal Google Drive** into a **single Google Workspace Shared Drive**.
 
-This project defines a clean migration architecture and now includes an MVP alpha (see `app/`).
+This project defines a clean migration architecture and now includes an MVP (see `app/`).
 
 ## Overview
 
@@ -24,7 +22,7 @@ Commercial tools exist, but none offer a transparent, open-source, multi-owner m
 
 This project aims to fill that gap with a **clear, auditable**, and **documented** migration workflow.
 
-## Key Concepts (Planned)
+## Key Concepts
 
 ### 1. Admin-driven folder reconstruction
 A Workspace admin uses the tool to perform an enumeration pass over the shared personal folder tree:
@@ -64,7 +62,11 @@ The migration engine supports three per-job modes:
 2. **Move + Restore Copy** — files are moved (same ID now lives in the Shared Drive), then a same-name copy is recreated at the original location so collaborators still see a file there (the restored file gets a new ID).
 3. **Copy** — source files stay in place (original ID untouched) and a same-name copy with a new ID is created in the Shared Drive.
 
-Move-based modes therefore keep historical links/bookmarks working because the underlying ID is preserved. The “restore copy” option merely replenishes the source location with a new-file-ID twin so collaborators are not surprised, whereas the pure copy mode leaves the original in place and only adds a new ID in the Shared Drive.
+At this stage, only 1 **Move** has been implemented.
+
+Move-based modes keep historical links/bookmarks working because the underlying file IDs and therefore the URLs are preserved.
+The “restore copy” option merely replenishes the source location with a new-file-ID twin so collaborators are not surprised,
+whereas the pure copy mode leaves the original in place and only adds a new ID in the Shared Drive.
 
 Only Workspace-safe operations are used; ownership transfers remain disallowed.
 
@@ -72,14 +74,23 @@ This tool may or may not reach beta maturity; usefulness will determine developm
 
 ## Current Stage
 
-- Architecture design in progress; see [Design overview](docs/design-overview.md) for details.
-- Documentation drafted before implementation, updated as alpha features land.
-- MVP alpha implemented in `app/`:
+- Architecture design complete; see [Design overview](docs/design-overview.md) for details.
+- Documentation drafted before implementation, updated as more features land.
+- MVP (alpha) implemented in `app/`:
   - Two SPAs (Admin + User), static hosting, OAuth in browser.
-  - Coordination via a single Google Sheet with `JobInfo`, `Manifest`, and `Log` tabs.
-  - Move-only transfer mode; copy modes remain deferred.
+  - Coordination via a single Google Sheet, with `JobInfo`, `Manifest`, and `Log` tabs.
+  - Move-only transfer mode; copy modes remain planned.
   - User SPA resumes on the same device/browser using a local journal; Admin SPA can refresh a manifest list view.
 - Key risks are tracked in [docs/risks.md](docs/risks.md).
+
+## Admin workflow
+
+Since this app has not been approved as a regular Google Workspace app,
+running this at this stage requires a number of Admin operations,
+which have not been documented yet.
+If you are interested in trying this app out, the best thing is to contact the author by email.
+
+More documentation is planned but it may take a while to land.
 
 ## Contributing
 
