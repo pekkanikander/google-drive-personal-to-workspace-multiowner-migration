@@ -167,7 +167,7 @@ Moves keep IDs intact, so downstream references/bookmarks continue to work; the 
 
 ### Idempotency approach (moves vs. copies)
 
-- **Move:** treat as “effectively idempotent” by reading live parents first. If the file is already in the destination drive/parent, treat as done. Otherwise, issue `PATCH files/{id}` with `supportsAllDrives=true`, `addParents=<dest_parent_id>`, and `removeParents=<current parents from the fresh GET>`. Do not reuse stale `removeParents` values. Retries re-run the same check+patch, avoiding duplicates.
+- **Move:** treat as “effectively idempotent” by reading live parents first. If the file is already in the destination drive/parent, treat as done. Otherwise, issue `PATCH files/{id}` with `supportsAllDrives=true`, `addParents=<dest_parent_id>`, and `removeParents=<current parents from the fresh GET>`. If live `parents` is empty, use fallback `PATCH` with `addParents` only and then verify with a fresh `GET` that destination parent is present before marking done. Do not reuse stale `removeParents` values. Retries re-run the same check+patch, avoiding duplicates.
 - **Copy / move+restore copy:**
   `files.copy` always creates a new ID; retries will duplicate unless the destination IDs are recorded.
   Later modes must track `dest_file_id` (and `restore_copy_id`) in the manifest and skip

@@ -672,7 +672,19 @@ async function main() {
           return { status: "DONE" as ManifestStatus, details: "already in destination" };
         }
         if (parents.length === 0) {
-          return { status: "FAILED" as ManifestStatus, error: "file has no parents" };
+          await drive.addParent(fileId, destParentId);
+          const verified = await drive.getFile(fileId);
+          const verifiedParents = verified.parents ?? [];
+          if (verifiedParents.includes(destParentId)) {
+            return {
+              status: "DONE" as ManifestStatus,
+              details: "moved with fallback: source parent not visible",
+            };
+          }
+          return {
+            status: "FAILED" as ManifestStatus,
+            error: "source parent missing or not visible; fallback addParents did not place file in destination",
+          };
         }
         await drive.moveFile(fileId, destParentId, parents);
         return { status: "DONE" as ManifestStatus };

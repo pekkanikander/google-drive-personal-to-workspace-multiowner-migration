@@ -96,7 +96,14 @@ export class DriveClient {
   async moveFile(fileId: string, destParentId: string, removeParents: string[]): Promise<DriveFile> {
     const remove = removeParents.join(",");
     return this.request<DriveFile>(
-      `/files/${fileId}?supportsAllDrives=true&addParents=${destParentId}&removeParents=${encodeURIComponent(remove)}`,
+      `/files/${fileId}?supportsAllDrives=true&addParents=${encodeURIComponent(destParentId)}&removeParents=${encodeURIComponent(remove)}`,
+      { method: "PATCH", body: "{}" },
+    );
+  }
+
+  async addParent(fileId: string, destParentId: string): Promise<DriveFile> {
+    return this.request<DriveFile>(
+      `/files/${fileId}?supportsAllDrives=true&addParents=${encodeURIComponent(destParentId)}`,
       { method: "PATCH", body: "{}" },
     );
   }
